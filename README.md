@@ -98,3 +98,30 @@ integration_test/
 - O backup exportado deve ser salvo pelo usuário em um local seguro; o aplicativo não mantém uma cópia remota.
 - Não existe bloqueio biométrico/PIN nem criptografia adicional do banco local.
 - Rotina planejada e sessões de hobbies são fontes distintas; não há timer de execução nem conversão automática entre elas.
+
+## Evolução incremental — entrega de 12/10/2026
+
+Esta revisão preserva o esquema SQLite e o backup existentes (sem migrations destrutivas).
+Foram integradas as seguintes melhorias:
+
+- Formulário de metas: início predefinido na data de criação; sugestão de prazo por dia/semana/mês/trimestre/ano com calendário real e possibilidade de ajuste manual. Para uma meta já existente, as datas permanecem como foram salvas.
+- Preferência `Automático por horário`: tema claro entre 07:00 e 18:59, escuro entre 19:00 e 06:59. Atualização a cada minuto ou na retomada do aplicativo. Persistência na tabela existente de configurações.
+- Home: gráfico circular do dia com categorias planejadas, ocupação líquida, intervalo ainda não definido e expansão por atividades concretas. Sobreposições são contadas uma vez, priorizando a categoria do bloco que começa antes; em empates, a ordem do banco. O gráfico representa planejamento, não tempo realizado.
+- Regras puras de calendário, ocupação e tema, com testes dedicados em `test/calculations_test.dart`.
+
+### Pendências da especificação ampliada
+
+Login Google, permissões e sincronização Calendar API, PIN/biometria reais, onboarding de saúde, agenda visual completa, sessões realizadas, alimentação, gráficos históricos, biblioteca de citações verificadas e incorporação de Fraunces/Inter/JetBrains Mono **não foram implementados nesta etapa**. Não utilize versões falsas desses fluxos. O login Google depende de configuração de OAuth/Google Cloud e testes em Android. O bloqueio local depende de mecanismos seguros nativos. Os dados da base atual permanecem locais e não são associados a uma identidade Google.
+
+### Verificação
+
+O ambiente de autoria desta entrega não dispõe de `flutter` nem `dart`. Os testes e a compilação precisam ser executados em um ambiente Flutter configurado:
+
+```sh
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```
+
+Não foram inseridos dados pessoais fictícios.

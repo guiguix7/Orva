@@ -42,7 +42,7 @@ class OrvaSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(children: [
       Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
-      if (trailing != null) trailing!,
+      ?trailing,
       if (actionLabel != null && onAction != null)
         TextButton(onPressed: onAction, style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)), child: Text(actionLabel!)),
     ]);
@@ -145,6 +145,6 @@ String formatClock(int minuteOfDay) {
   return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
 }
 
-String? stringValue(Object? value) => value == null ? null : value.toString();
+String? stringValue(Object? value) => value?.toString();
 int intValue(Object? value, [int fallback = 0]) => value is num ? value.toInt() : fallback;
 double doubleValue(Object? value, [double fallback = 0]) => value is num ? value.toDouble() : fallback;

@@ -74,7 +74,7 @@ class _ChecklistsPageState extends ConsumerState<ChecklistsPage> {
                 : RefreshIndicator(onRefresh: _load, child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 6, 20, 100),
                     itemCount: displayed.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
                       final checklist = displayed[index];
                       final id = checklist['id'] as String;
@@ -211,7 +211,7 @@ Future<void> showAddTodayTaskDialog(BuildContext context, WidgetRef ref) async {
           list = await repo.getChecklists(includeTemplates: false);
           checklist = list.firstWhere((item) => item['title'] == title && item['scheduled_date'] == date);
         }
-        await repo.addChecklistItem(checklistId: checklist!['id'] as String, title: controller.text);
+        await repo.addChecklistItem(checklistId: checklist['id'] as String, title: controller.text);
         if (dialogContext.mounted) Navigator.pop(dialogContext);
         if (context.mounted) showOrvaMessage(context, 'Tarefa adicionada ao checklist de hoje.');
       } catch (error) { if (dialogContext.mounted) showOrvaError(dialogContext, error); }
@@ -240,7 +240,7 @@ Future<bool?> showChecklistEditor(BuildContext context, WidgetRef ref, {Map<Stri
       const SizedBox(height: 12),
       TextFormField(controller: description, decoration: const InputDecoration(labelText: 'Descrição (opcional)'), maxLines: 3),
       const SizedBox(height: 12),
-      DropdownButtonFormField<String>(value: recurrence, decoration: const InputDecoration(labelText: 'Frequência'), items: const [
+      DropdownButtonFormField<String>(initialValue: recurrence, decoration: const InputDecoration(labelText: 'Frequência'), items: const [
         DropdownMenuItem(value: 'once', child: Text('Uma data específica')),
         DropdownMenuItem(value: 'daily', child: Text('Todos os dias')),
         DropdownMenuItem(value: 'weekly', child: Text('Dias da semana')),
@@ -318,7 +318,7 @@ Future<void> showChecklistDetails(BuildContext context, WidgetRef ref, Map<Strin
                       ? const OrvaEmptyState(icon: Icons.history_rounded, title: 'Sem histórico ainda', message: 'As ocorrências serão registradas quando este checklist for elegível para uma data.', compact: true)
                       : ListView.separated(
                           itemCount: history.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final occurrence = history[index];
                             final total = intValue(occurrence['total']);
@@ -355,7 +355,7 @@ Future<void> showChecklistDetails(BuildContext context, WidgetRef ref, Map<Strin
                                                 ? const OrvaEmptyState(icon: Icons.checklist_outlined, title: 'Sem itens registrados', message: 'Esta ocorrência não possui snapshots de itens.', compact: true)
                                                 : ListView.separated(
                                                     itemCount: snapshots.length,
-                                                    separatorBuilder: (_, __) => const Divider(height: 1),
+                                                    separatorBuilder: (_, _) => const Divider(height: 1),
                                                     itemBuilder: (historyContext, itemIndex) {
                                                       final snapshot = snapshots[itemIndex];
                                                       final checked = intValue(snapshot['completed']) == 1;

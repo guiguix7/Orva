@@ -39,7 +39,7 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
       ])),
       Expanded(child: _loading ? const Center(child: CircularProgressIndicator()) : _categories.isEmpty
         ? ListView(children: [OrvaEmptyState(icon: Icons.label_outline_rounded, title: 'Nenhuma categoria salva', message: 'As categorias que você digitar em metas, rotina ou hobbies também são registradas aqui. Você pode criar sugestões antes de usá-las.', actionLabel: 'Criar categoria', onAction: () async { await showCategoryEditor(context, ref, scope: _scope); await _load(); })])
-        : RefreshIndicator(onRefresh: _load, child: ListView.separated(padding: const EdgeInsets.fromLTRB(20, 4, 20, 100), itemCount: _categories.length, separatorBuilder: (_, __) => const SizedBox(height: 8), itemBuilder: (context, index) {
+        : RefreshIndicator(onRefresh: _load, child: ListView.separated(padding: const EdgeInsets.fromLTRB(20, 4, 20, 100), itemCount: _categories.length, separatorBuilder: (_, _) => const SizedBox(height: 8), itemBuilder: (context, index) {
           final category = _categories[index];
           return OrvaSurface(child: Row(children: [
             Container(width: 38, height: 38, decoration: BoxDecoration(color: OrvaColors.primary.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(11)), child: const Icon(Icons.label_outline_rounded, color: OrvaColors.primary)),

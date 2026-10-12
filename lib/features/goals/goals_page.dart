@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/database/orva_repository.dart';
+import '../../core/domain/orva_calculations.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 
@@ -84,7 +85,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
                 : RefreshIndicator(onRefresh: _load, child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
                     itemCount: _goals.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) => _GoalCard(
                       goal: _goals[index],
                       onTap: () => _showGoalHistory(_goals[index]),
@@ -211,8 +212,10 @@ Future<bool?> showGoalEditor(BuildContext context, WidgetRef ref, {Map<String, O
   final progress = TextEditingController(text: (goal?['progress_value'] as num?)?.toString() ?? '0');
   String period = goal?['period'] as String? ?? 'open';
   String? parentId = goal?['parent_id'] as String?;
-  DateTime? startDate = _parseDate(goal?['start_date'] as String?);
+  DateTime? startDate = _parseDate(goal?['start_date'] as String?) ?? (goal == null ? DateTime.now() : null);
   DateTime? deadline = _parseDate(goal?['deadline'] as String?);
+  if (goal == null && startDate != null) deadline = suggestedGoalDeadline(period, startDate);
+  bool deadlineEdited = goal != null;
   final formKey = GlobalKey<FormState>();
   final result = await showDialog<bool>(
     context: context,
@@ -234,13 +237,15 @@ Future<bool?> showGoalEditor(BuildContext context, WidgetRef ref, {Map<String, O
             DropdownMenuItem(value: 'monthly', child: Text('Mensal')),
             DropdownMenuItem(value: 'quarterly', child: Text('Trimestral')),
             DropdownMenuItem(value: 'yearly', child: Text('Anual')),
-          ], onChanged: (value) => setState(() => period = value ?? 'open')),
+          ], onChanged: (value) => setState(() { period = value ?? 'open'; if (!deadlineEdited && startDate != null) deadline = suggestedGoalDeadline(period, startDate!); })),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: _DateSelect(label: 'Início (opcional)', value: startDate, onChanged: (date) => setState(() => startDate = date))),
+            Expanded(child: _DateSelect(label: 'Início', value: startDate, onChanged: (date) => setState(() { startDate = date; if (!deadlineEdited) deadline = date == null ? null : suggestedGoalDeadline(period, date); }))),
             const SizedBox(width: 8),
-            Expanded(child: _DateSelect(label: 'Prazo (opcional)', value: deadline, onChanged: (date) => setState(() => deadline = date))),
+            Expanded(child: _DateSelect(label: 'Prazo sugerido (editável)', value: deadline, onChanged: (date) => setState(() { deadline = date; deadlineEdited = true; }))),
           ]),
+          const SizedBox(height: 4),
+          Align(alignment: Alignment.centerLeft, child: Text('Início preenchido na criação; o prazo acompanha o período, mas pode ser alterado.', style: Theme.of(context).textTheme.bodySmall)),
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
             initialValue: parentId,

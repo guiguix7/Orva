@@ -17,7 +17,7 @@ final class AppDatabase extends GeneratedDatabase {
         );
 
   /// Isolated in-memory executor for repository and migration tests.
-  AppDatabase.forTesting(QueryExecutor executor) : super(executor);
+  AppDatabase.forTesting(super.executor);
 
   @override
   int get schemaVersion => 2;

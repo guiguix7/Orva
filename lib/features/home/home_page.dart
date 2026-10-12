@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -69,7 +72,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _summary = values[2] as Map<String, Object?>;
         _goals = (values[3] as List<Map<String, Object?>>).take(3).toList();
         _items = (values[4] as List<Map<String, Object?>>).take(5).toList();
-        _routine = (values[5] as List<Map<String, Object?>>).take(3).toList();
+        _routine = values[5] as List<Map<String, Object?>>;
         _hobbies = (values[6] as List<Map<String, Object?>>).take(3).toList();
         _loading = false;
         _error = null;
@@ -230,15 +233,17 @@ class _HomePageState extends ConsumerState<HomePage> {
                           OrvaSurface(child: OrvaEmptyState(icon: Icons.schedule_outlined, title: 'Sem blocos planejados', message: 'Organize o tempo do dia com atividades e horários definidos.', actionLabel: 'Adicionar atividade', onAction: () async { await showRoutineEditor(context, ref); await _load(); }, compact: true))
                         else
                           OrvaSurface(padding: const EdgeInsets.all(16), child: Column(children: [
-                            for (var i = 0; i < _routine.length; i++) ...[
+                            for (var i = 0; i < _routine.take(3).length; i++) ...[
                               _RoutineMiniRow(block: _routine[i]),
-                              if (i < _routine.length - 1) const SizedBox(height: 16),
+                              if (i < _routine.take(3).length - 1) const SizedBox(height: 16),
                             ],
                           ])),
                         const SizedBox(height: 28),
                         OrvaSectionHeader(title: 'Tempo planejado', actionLabel: 'Ver rotina', onAction: () => _openPage(const RoutinePage())),
                         const SizedBox(height: 12),
                         _TimeSummaryCard(summary: _summary, isDark: isDark),
+                        const SizedBox(height: 12),
+                        _DayAllocationCard(summary: _summary, routine: _routine),
                         const SizedBox(height: 28),
                         OrvaSectionHeader(title: 'Hobbies nesta semana', actionLabel: 'Ver hobbies', onAction: () => _openPage(const HobbiesPage())),
                         const SizedBox(height: 12),
@@ -418,6 +423,100 @@ class _TimeSummaryCard extends StatelessWidget {
     ]));
   }
 }
+
+
+/// Wall-clock planning overview. Does not claim activities were completed.
+class _DayAllocationCard extends StatelessWidget {
+  const _DayAllocationCard({required this.summary, required this.routine});
+  final Map<String, Object?> summary;
+  final List<Map<String, Object?>> routine;
+
+  @override
+  Widget build(BuildContext context) {
+    if (routine.isEmpty) {
+      return const OrvaSurface(child: OrvaEmptyState(icon: Icons.donut_large_outlined, title: 'Ainda não há horários planejados', message: 'Adicione blocos à rotina para visualizar a ocupação e as horas não definidas.', compact: true));
+    }
+    final occupied = intValue(summary['plannedMinutes']);
+    final free = 1440 - occupied;
+    final raw = summary['plannedCategories'];
+    final categories = raw is Map<String, int> ? raw : <String, int>{};
+    final scheme = Theme.of(context).colorScheme;
+    final colors = [OrvaColors.primary, OrvaColors.information, OrvaColors.terracotta,
+      OrvaColors.mustard, OrvaColors.success, const Color(0xFF8B6B9E)];
+    return OrvaSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Ocupação das 24 horas', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 6),
+      Text('Planejamento · horários sobrepostos contados uma única vez.', style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 18),
+      Center(child: SizedBox(width: 154, height: 154, child: Stack(alignment: Alignment.center, children: [
+        SizedBox.expand(child: CustomPaint(painter: _DailyRingPainter(
+          minutes: categories.values.toList(), colors: colors,
+          freeMinutes: free, emptyColor: scheme.surfaceContainerHighest,
+        ))),
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('${(occupied / 1440 * 100).round()}%', style: Theme.of(context).textTheme.headlineMedium),
+          Text('${formatMinutes(occupied)} planejadas', style: Theme.of(context).textTheme.bodySmall),
+        ]),
+      ]))),
+      const SizedBox(height: 18),
+      ...categories.entries.toList().asMap().entries.map((entry) {
+        final category = entry.value;
+        final related = routine.where((block) =>
+          ((block['category'] as String?)?.trim().isNotEmpty == true ? block['category'] : 'Sem categoria') == category.key).toList();
+        return ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          leading: CircleAvatar(radius: 6, backgroundColor: colors[entry.key % colors.length]),
+          title: Text(category.key, style: Theme.of(context).textTheme.bodyLarge),
+          trailing: Text(formatMinutes(category.value), style: Theme.of(context).textTheme.titleMedium),
+          children: related.map((block) => ListTile(
+            dense: true, title: Text('${block['title']}'),
+            subtitle: Text('${_homeClock(intValue(block['start_minute']))}–${_homeClock(intValue(block['end_minute']))} · horário planejado'),
+          )).toList(),
+        );
+      }),
+      const Divider(height: 20),
+      Row(children: [
+        Expanded(child: Text('Tempo não definido', style: Theme.of(context).textTheme.bodyLarge)),
+        Text(formatMinutes(free), style: Theme.of(context).textTheme.titleMedium),
+      ]),
+      const SizedBox(height: 5),
+      Text('Horas livres não são interpretadas como improdutividade.', style: Theme.of(context).textTheme.bodySmall),
+    ]));
+  }
+}
+
+class _DailyRingPainter extends CustomPainter {
+  const _DailyRingPainter({required this.minutes, required this.colors, required this.freeMinutes, required this.emptyColor});
+  final List<int> minutes;
+  final List<Color> colors;
+  final int freeMinutes;
+  final Color emptyColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 9;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final paint = Paint()..style = PaintingStyle.stroke..strokeWidth = 16;
+    var angle = -math.pi / 2;
+    for (var i = 0; i < minutes.length; i++) {
+      final sweep = minutes[i] / 1440 * 2 * math.pi;
+      paint.color = colors[i % colors.length];
+      canvas.drawArc(rect, angle, sweep, false, paint);
+      angle += sweep;
+    }
+    paint.color = emptyColor;
+    canvas.drawArc(rect, angle, freeMinutes / 1440 * 2 * math.pi, false, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DailyRingPainter oldDelegate) =>
+      oldDelegate.freeMinutes != freeMinutes ||
+      oldDelegate.emptyColor != emptyColor ||
+      !listEquals(oldDelegate.minutes, minutes);
+}
+
+String _homeClock(int minute) => '${(minute ~/ 60).toString().padLeft(2, '0')}:${(minute % 60).toString().padLeft(2, '0')}';
 
 class _HobbyMiniRow extends StatelessWidget {
   const _HobbyMiniRow({required this.hobby});

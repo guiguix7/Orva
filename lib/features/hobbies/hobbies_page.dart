@@ -41,7 +41,7 @@ class _HobbiesPageState extends ConsumerState<HobbiesPage> {
           : RefreshIndicator(onRefresh: _load, child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
               itemCount: _hobbies.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final hobby = _hobbies[index];
                 final actual = intValue(hobby['actual_minutes']);
@@ -102,7 +102,7 @@ class _HobbiesPageState extends ConsumerState<HobbiesPage> {
         const SizedBox(height: 14),
         Row(children: [Expanded(child: Text('Histórico de sessões', style: Theme.of(context).textTheme.titleMedium)), if (intValue(hobby['is_active']) == 1) FilledButton.icon(onPressed: () async { await showHobbySessionEditor(context, ref, hobby); sessions = await repo.getHobbySessions(hobby['id'] as String); if (sheetContext.mounted) setSheetState(() {}); }, icon: const Icon(Icons.add, size: 18), label: const Text('Registrar'))]),
         const SizedBox(height: 8),
-        if (sessions.isEmpty) const Expanded(child: OrvaEmptyState(icon: Icons.timer_outlined, title: 'Nenhuma sessão registrada', message: 'Registre a duração de uma atividade quando ela acontecer.', compact: true)) else Expanded(child: ListView.separated(itemCount: sessions.length, separatorBuilder: (_, __) => const Divider(height: 1), itemBuilder: (context, index) {
+        if (sessions.isEmpty) const Expanded(child: OrvaEmptyState(icon: Icons.timer_outlined, title: 'Nenhuma sessão registrada', message: 'Registre a duração de uma atividade quando ela acontecer.', compact: true)) else Expanded(child: ListView.separated(itemCount: sessions.length, separatorBuilder: (_, _) => const Divider(height: 1), itemBuilder: (context, index) {
           final session = sessions[index];
           return ListTile(
             contentPadding: EdgeInsets.zero,

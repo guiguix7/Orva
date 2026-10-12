@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'core/domain/orva_calculations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/database/orva_repository.dart';
@@ -8,16 +11,48 @@ import 'features/goals/goals_page.dart';
 import 'features/home/home_page.dart';
 import 'features/more/more_page.dart';
 
-class OrvaApp extends ConsumerWidget {
+class OrvaApp extends ConsumerStatefulWidget {
   const OrvaApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrvaApp> createState() => _OrvaAppState();
+}
+
+class _OrvaAppState extends ConsumerState<OrvaApp> with WidgetsBindingObserver {
+  Timer? _clock;
+  DateTime _now = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() => _now = DateTime.now());
+    }
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final ready = ref.watch(databaseReadyProvider);
     final themeName = ref.watch(themeNameProvider).asData?.value ?? 'light';
     final themeMode = switch (themeName) {
       'dark' => ThemeMode.dark,
       'system' => ThemeMode.system,
+      'dayNight' => isNightTheme(_now) ? ThemeMode.dark : ThemeMode.light,
       _ => ThemeMode.light,
     };
     return MaterialApp(

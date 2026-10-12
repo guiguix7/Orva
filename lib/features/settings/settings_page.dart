@@ -62,8 +62,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         files: [XFile.fromData(bytes, mimeType: 'application/json', name: 'orva-backup.json')],
         fileNameOverrides: const ['orva-backup.json'],
       ));
-      if (mounted && result.status == ShareResultStatus.success) showOrvaMessage(context, 'O backup foi enviado ao destino escolhido.');
-      else if (mounted && result.status == ShareResultStatus.dismissed) showOrvaMessage(context, 'Compartilhamento cancelado. O banco local não foi alterado.');
+      if (mounted && result.status == ShareResultStatus.success) {
+        showOrvaMessage(context, 'O backup foi enviado ao destino escolhido.');
+      } else if (mounted && result.status == ShareResultStatus.dismissed) showOrvaMessage(context, 'Compartilhamento cancelado. O banco local não foi alterado.');
     } catch (error) { if (mounted) showOrvaError(context, error); }
     finally { if (mounted) setState(() => _busy = false); }
   }
@@ -118,6 +119,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           RadioListTile<String>(value: 'dark', groupValue: _theme, title: const Text('Escuro'), secondary: const Icon(Icons.dark_mode_outlined), onChanged: (value) => setState(() => _theme = value ?? 'dark'), contentPadding: EdgeInsets.zero),
           const Divider(height: 1),
           RadioListTile<String>(value: 'system', groupValue: _theme, title: const Text('Seguir sistema'), secondary: const Icon(Icons.brightness_6_outlined), onChanged: (value) => setState(() => _theme = value ?? 'system'), contentPadding: EdgeInsets.zero),
+          const Divider(height: 1),
+          RadioListTile<String>(value: 'dayNight', groupValue: _theme, title: const Text('Automático por horário'), subtitle: const Text('Claro das 07h às 19h e escuro à noite'), secondary: const Icon(Icons.nights_stay_outlined), onChanged: (value) => setState(() => _theme = value ?? 'dayNight'), contentPadding: EdgeInsets.zero),
         ])),
         const SizedBox(height: 14),
         SizedBox(width: double.infinity, child: FilledButton(onPressed: _busy ? null : _saveProfile, child: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Salvar preferências'))),

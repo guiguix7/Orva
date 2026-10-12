@@ -42,7 +42,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
       const SizedBox(height: 14),
       Expanded(child: _loading ? const Center(child: CircularProgressIndicator()) : _notes.isEmpty
         ? ListView(children: [OrvaEmptyState(icon: Icons.edit_note_outlined, title: _search.text.isEmpty ? 'Seu espaço de ideias começa aqui' : 'Nenhuma nota encontrada', message: _search.text.isEmpty ? 'Guarde uma ideia assim que ela aparecer. Você pode editar o conteúdo depois.' : 'Tente outro termo de busca ou limpe o campo.', actionLabel: _search.text.isEmpty ? 'Escrever primeira nota' : null, onAction: _search.text.isEmpty ? () async { await showNoteEditor(context, ref); await _load(); } : null)])
-        : RefreshIndicator(onRefresh: _load, child: ListView.separated(padding: const EdgeInsets.fromLTRB(20, 4, 20, 100), itemCount: _notes.length, separatorBuilder: (_, __) => const SizedBox(height: 10), itemBuilder: (context, index) {
+        : RefreshIndicator(onRefresh: _load, child: ListView.separated(padding: const EdgeInsets.fromLTRB(20, 4, 20, 100), itemCount: _notes.length, separatorBuilder: (_, _) => const SizedBox(height: 10), itemBuilder: (context, index) {
           final note = _notes[index];
           final content = (note['content'] as String?) ?? '';
           final tags = _readTags(note['tags_json']);

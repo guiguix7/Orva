@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_database.dart';
+import '../domain/orva_calculations.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final database = AppDatabase();
@@ -579,7 +580,13 @@ final class OrvaRepository {
     final total = todayItems.length;
     final completed = todayItems.where((item) => (item['completed'] as num).toInt() == 1).length;
     final routine = await getRoutineForDate(target);
-    final plannedMinutes = routine.fold<int>(0, (sum, block) => sum + ((block['end_minute'] as num).toInt() - (block['start_minute'] as num).toInt()));
+    final intervals = routine.map((block) => PlannedInterval(
+      (block['start_minute'] as num).toInt(), (block['end_minute'] as num).toInt(),
+      (block['category'] as String?)?.trim().isNotEmpty == true ? block['category'] as String : 'Sem categoria',
+      block['title'] as String,
+    )).toList();
+    final plannedMinutes = occupiedMinutes(intervals);
+    final categoryTotals = categoryMinutes(intervals);
     return {
       'activeGoals': (goals.first['count'] as num).toInt(),
       'checklistTotal': total,
@@ -587,6 +594,8 @@ final class OrvaRepository {
       'checklistProgress': total == 0 ? null : completed / total,
       'routineBlocks': routine.length,
       'plannedMinutes': plannedMinutes,
+      'unplannedMinutes': 1440 - plannedMinutes,
+      'plannedCategories': categoryTotals,
     };
   }
 
