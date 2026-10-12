@@ -33,6 +33,21 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local data and credentials
+*.sqlite
+*.sqlite3
+*.db
+.env
+.env.*
+!.env.example
+**/key.properties
+**/google-services.json
+**/service-account*.json
+*.jks
+*.keystore
+*.p12
+*.pem
+
 # Symbolication related
 app.*.symbols
 
@@ -50,4 +65,3 @@ app.*.map.json
 /android/local.properties
 /ios/Flutter/Generated.xcconfig
 /ios/Flutter/flutter_export_environment.sh
-
