@@ -273,6 +273,128 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     note.dispose();
   }
 
+  Future<void> _planStudyBlock(
+    Map<String, Object?> subject, {
+    Map<String, Object?>? topic,
+  }) async {
+    final repo = ref.read(repositoryProvider);
+    final dateController = TextEditingController();
+    final duration = TextEditingController(text: '45');
+    var date = DateTime.now();
+    var startMinute = (date.hour * 60 + date.minute + 4) ~/ 5 * 5;
+    if (startMinute >= 1440) startMinute = 23 * 60;
+    if (!mounted) {
+      dateController.dispose();
+      duration.dispose();
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Planejar sessão de estudo'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(
+                topic == null
+                    ? 'Matéria: ${subject['name']}'
+                    : 'Matéria: ${subject['name']}\nAssunto: ${topic['name']}',
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: date,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) setDialog(() => date = picked);
+                },
+                icon: const Icon(Icons.calendar_today_outlined),
+                label: Text(DateFormat('dd/MM/yyyy', 'pt_BR').format(date)),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay(
+                      hour: startMinute ~/ 60,
+                      minute: startMinute % 60,
+                    ),
+                  );
+                  if (picked != null) {
+                    setDialog(() => startMinute = picked.hour * 60 + picked.minute);
+                  }
+                },
+                icon: const Icon(Icons.schedule_outlined),
+                label: Text('Início: ${formatClock(startMinute)}'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: duration,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Duração em minutos *',
+                  helperText: 'O bloco vai para a rotina. Ele não registra estudo realizado.',
+                ),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final minutes = int.tryParse(duration.text.trim());
+                if (minutes == null || minutes < 1 || minutes > 1440) {
+                  showOrvaMessage(dialog, 'Informe uma duração inteira entre 1 e 1440 minutos.');
+                  return;
+                }
+                if (startMinute + minutes > 1440) {
+                  showOrvaMessage(dialog, 'A sessão planejada deve terminar antes da meia-noite. Escolha outro horário ou duração.');
+                  return;
+                }
+                Navigator.pop(dialog, true);
+              },
+              child: const Text('Adicionar à rotina'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (ok == true && mounted) {
+      try {
+        final minutes = int.parse(duration.text.trim());
+        final title = topic == null
+            ? 'Estudar · ${subject['name']}'
+            : 'Estudar · ${subject['name']} · ${topic['name']}';
+        await repo.saveRoutineBlock(
+          title: title,
+          category: 'Estudos',
+          startMinute: startMinute,
+          endMinute: startMinute + minutes,
+          blockKind: 'date',
+          specificDate: repo.dateKey(date),
+          goalId: subject['goal_id'] as String?,
+        );
+        if (mounted) {
+          showOrvaMessage(
+            context,
+            'Sessão adicionada à rotina. Para contar como realizada, registre a sessão depois do estudo.',
+          );
+        }
+      } catch (error) {
+        if (mounted) showOrvaError(context, error);
+      }
+    }
+    dateController.dispose();
+    duration.dispose();
+  }
+
   Future<void> _review(Map<String, Object?> subject, Map<String, Object?> topic) async {
     final note = TextEditingController();
     var confidence = 3;
@@ -367,7 +489,8 @@ class _StudyPageState extends ConsumerState<StudyPage> {
                   Align(alignment: Alignment.centerLeft, child: Text(subject['description'] as String)),
                 Row(children: [
                   TextButton.icon(onPressed: active ? () => _editTopic(subject) : null, icon: const Icon(Icons.add, size: 18), label: const Text('Assunto')),
-                  TextButton.icon(onPressed: active ? () => _logSession(subject['id'] as String) : null, icon: const Icon(Icons.timer_outlined, size: 18), label: const Text('Sessão')),
+                  TextButton.icon(onPressed: active ? () => _logSession(subject['id'] as String) : null, icon: const Icon(Icons.timer_outlined, size: 18), label: const Text('Registrar')),
+                  TextButton.icon(onPressed: active ? () => _planStudyBlock(subject) : null, icon: const Icon(Icons.event_outlined, size: 18), label: const Text('Planejar')),
                   const Spacer(),
                   PopupMenuButton<String>(
                     onSelected: (choice) {
@@ -400,6 +523,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
                           if (choice == 'subtopic') _editTopic(subject, parent: topic);
                           if (choice == 'status') _advanceTopic(topic);
                           if (choice == 'review') _review(subject, topic);
+                          if (choice == 'plan') _planStudyBlock(subject, topic: topic);
                           if (choice == 'delete') _deleteTopic(topic);
                         },
                         itemBuilder: (_) => [
@@ -407,6 +531,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
                           if (active) const PopupMenuItem(value: 'subtopic', child: Text('Adicionar subtópico')),
                           if (active) const PopupMenuItem(value: 'status', child: Text('Avançar estado')),
                           if (active) const PopupMenuItem(value: 'review', child: Text('Registrar revisão')),
+                          if (active) const PopupMenuItem(value: 'plan', child: Text('Planejar sessão na rotina')),
                           const PopupMenuItem(value: 'delete', child: Text('Excluir sem histórico')),
                         ],
                       ),
@@ -439,7 +564,6 @@ class _StudyPageState extends ConsumerState<StudyPage> {
 
   @override
   Widget build(BuildContext context) {
-    final activeSubjects = _subjects.where((s) => intValue(s['is_active']) == 1).toList();
     return Scaffold(
       floatingActionButton: _archived ? null : FloatingActionButton.extended(
         onPressed: () => _logSession(),
