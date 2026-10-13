@@ -130,11 +130,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     final choice = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Criar algo novo', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 14),
             _QuickActionTile(icon: Icons.check_circle_outline, title: 'Tarefa de hoje', subtitle: 'Adicionar um item ao checklist do dia', onTap: () => Navigator.pop(context, 'task')),
@@ -146,7 +148,8 @@ class _HomePageState extends ConsumerState<HomePage> {
             _QuickActionTile(icon: Icons.school_outlined, title: 'Sessão de estudo', subtitle: 'Registrar tempo e assunto estudado', onTap: () => Navigator.pop(context, 'study')),
             _QuickActionTile(icon: Icons.restaurant_outlined, title: 'Consumo alimentar', subtitle: 'Registrar o que realmente consumiu', onTap: () => Navigator.pop(context, 'nutrition')),
             _QuickActionTile(icon: Icons.repeat_outlined, title: 'Obrigação recorrente', subtitle: 'Configurar uma necessidade que se repete', onTap: () => Navigator.pop(context, 'obligation')),
-          ]),
+            ]),
+          ),
         ),
       ),
     );
