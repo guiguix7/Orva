@@ -37,9 +37,9 @@ class _LockScreenState extends ConsumerState<LockScreen> {
   }
 
   Future<void> _maybeTryBiometric() async {
-    final repo = ref.read(repositoryProvider);
-    if (!await repo.isBiometricEnabled() || !mounted) return;
     try {
+      final repo = ref.read(repositoryProvider);
+      if (!await repo.isBiometricEnabled() || !mounted) return;
       final auth = LocalAuthentication();
       if (!await OrvaBiometricSupport.canAuthenticate(auth) || !mounted) return;
       final ok = await auth.authenticate(
