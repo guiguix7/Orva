@@ -31,6 +31,7 @@ class NutritionPage extends ConsumerStatefulWidget {
 
 class _NutritionPageState extends ConsumerState<NutritionPage> {
   String _tab = 'today';
+  String _foodQuery = '';
   late DateTime _date = widget.initialDate ?? DateTime.now();
   bool _loading = true;
   List<Map<String, Object?>> _foods = [];
@@ -501,6 +502,11 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
   @override
   Widget build(BuildContext context) {
     final isToday = DateUtils.isSameDay(_date, DateTime.now());
+    final query = _foodQuery.trim().toLowerCase();
+    final visibleFoods = _foods.where((food) {
+      final searchable = '${food['name']} ${food['brand'] ?? ''}'.toLowerCase();
+      return query.isEmpty || searchable.contains(query);
+    }).toList();
     return Scaffold(
       floatingActionButton: _tab == 'today'
           ? FloatingActionButton.extended(onPressed: () => _logConsumption(), icon: const Icon(Icons.restaurant_outlined), label: const Text('Registrar consumo'))
@@ -580,10 +586,27 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
                 const SizedBox(height: 6),
                 Text('Cadastre informações de rótulos ou tabelas confiáveis; campos em branco permanecem desconhecidos.', style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 12),
-                if (_foods.isEmpty)
-                  OrvaEmptyState(icon: Icons.egg_alt_outlined, title: 'Seu catálogo está vazio', message: 'Adicione alimentos e informe apenas os valores nutricionais que você conhece.', actionLabel: 'Cadastrar alimento', onAction: () => _editFood(), compact: true)
+                TextField(
+                  onChanged: (value) => setState(() => _foodQuery = value),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Buscar alimento ou marca',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (visibleFoods.isEmpty)
+                  OrvaEmptyState(
+                    icon: Icons.egg_alt_outlined,
+                    title: _foods.isEmpty ? 'Seu catálogo está vazio' : 'Nenhum alimento encontrado',
+                    message: _foods.isEmpty
+                        ? 'Adicione alimentos e informe apenas os valores nutricionais que você conhece.'
+                        : 'Tente outro nome ou cadastre um novo alimento. Os dados ausentes continuam desconhecidos.',
+                    actionLabel: 'Cadastrar alimento',
+                    onAction: () => _editFood(),
+                    compact: true,
+                  )
                 else
-                  ..._foods.map(_foodCard),
+                  ...visibleFoods.map(_foodCard),
               ],
             ],
           )),
