@@ -8,6 +8,10 @@ import 'package:intl/intl.dart';
 
 import '../../core/database/orva_repository.dart';
 import '../../core/domain/orva_calculations.dart';
+import '../../core/database/obligations_repository.dart';
+import '../obligations/obligations_page.dart';
+import '../nutrition/nutrition_page.dart';
+import '../studies/study_page.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 import '../checklists/checklists_page.dart';
@@ -78,16 +82,37 @@ class _HomePageState extends ConsumerState<HomePage> {
         repo.getTodayOccurrenceItems(now),
         repo.getRoutineForDate(now),
         repo.getWeeklyHobbyMinutes(date: now),
+        repo.getObligationTimeBlocksForDate(now),
       ]);
       if (!mounted) return;
+      final routineBlocks = values[5] as List<Map<String, Object?>>;
+      final hobbyRows = values[6] as List<Map<String, Object?>>;
+      final obligationBlocks = values[7] as List<Map<String, Object?>>;
+      final allBlocks = <Map<String, Object?>>[
+        ...routineBlocks,
+        ...obligationBlocks,
+      ]..sort((a, b) => intValue(a['start_minute']).compareTo(intValue(b['start_minute'])));
+      final intervals = allBlocks.map((block) => PlannedInterval(
+        intValue(block['start_minute']),
+        intValue(block['end_minute']),
+        (block['category'] as String?)?.trim().isNotEmpty == true
+            ? block['category'] as String
+            : 'Sem categoria',
+        block['title'] as String? ?? '',
+      )).toList();
+      final summary = Map<String, Object?>.from(values[2] as Map<String, Object?>)
+        ..['routineBlocks'] = allBlocks.length
+        ..['plannedMinutes'] = occupiedMinutes(intervals)
+        ..['unplannedMinutes'] = 1440 - occupiedMinutes(intervals)
+        ..['plannedCategories'] = categoryMinutes(intervals);
       setState(() {
         _userName = (values[0] as String?)?.trim();
         _focus = (values[1] as String?)?.trim();
-        _summary = values[2] as Map<String, Object?>;
+        _summary = summary;
         _goals = (values[3] as List<Map<String, Object?>>).take(3).toList();
         _items = (values[4] as List<Map<String, Object?>>).take(5).toList();
-        _routine = values[5] as List<Map<String, Object?>>;
-        _hobbies = (values[6] as List<Map<String, Object?>>).take(3).toList();
+        _routine = allBlocks;
+        _hobbies = hobbyRows.take(3).toList();
         _loading = false;
         _error = null;
       });
@@ -114,6 +139,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             _QuickActionTile(icon: Icons.menu_book_outlined, title: 'Entrada no diário', subtitle: 'Registrar algo sobre o seu dia', onTap: () => Navigator.pop(context, 'journal')),
             _QuickActionTile(icon: Icons.schedule_outlined, title: 'Bloco de rotina', subtitle: 'Planejar um período de tempo', onTap: () => Navigator.pop(context, 'routine')),
             _QuickActionTile(icon: Icons.sports_esports_outlined, title: 'Hobby', subtitle: 'Acompanhar tempo de uma atividade', onTap: () => Navigator.pop(context, 'hobby')),
+            _QuickActionTile(icon: Icons.school_outlined, title: 'Sessão de estudo', subtitle: 'Registrar tempo e assunto estudado', onTap: () => Navigator.pop(context, 'study')),
+            _QuickActionTile(icon: Icons.restaurant_outlined, title: 'Consumo alimentar', subtitle: 'Registrar o que realmente consumiu', onTap: () => Navigator.pop(context, 'nutrition')),
+            _QuickActionTile(icon: Icons.repeat_outlined, title: 'Obrigação recorrente', subtitle: 'Configurar uma necessidade que se repete', onTap: () => Navigator.pop(context, 'obligation')),
           ]),
         ),
       ),
@@ -138,6 +166,15 @@ class _HomePageState extends ConsumerState<HomePage> {
           break;
         case 'hobby':
           await showHobbyEditor(context, ref);
+          break;
+        case 'study':
+          await _openPage(const StudyPage());
+          break;
+        case 'nutrition':
+          await _openPage(const NutritionPage());
+          break;
+        case 'obligation':
+          await _openPage(const ObligationsPage());
           break;
       }
       await _load();
