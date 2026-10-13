@@ -128,6 +128,7 @@ extension NutritionRepository on OrvaRepository {
     String? startDate,
     String? endDate,
     int? plannedMinute,
+    int? durationMinutes,
     String note = '',
     bool active = true,
   }) async {
@@ -144,6 +145,16 @@ extension NutritionRepository on OrvaRepository {
     if (plannedMinute != null && (plannedMinute < 0 || plannedMinute >= 1440)) {
       throw ArgumentError('Horário da refeição inválido.');
     }
+    if (durationMinutes != null &&
+        (durationMinutes < 1 || durationMinutes > 1440)) {
+      throw ArgumentError('A duração planejada deve estar entre 1 e 1440 minutos.');
+    }
+    if (durationMinutes != null && plannedMinute == null) {
+      throw ArgumentError('Defina um horário inicial antes de informar a duração.');
+    }
+    if (durationMinutes != null && plannedMinute! + durationMinutes > 1440) {
+      throw ArgumentError('O intervalo da refeição não pode ultrapassar a meia-noite. Escolha outro horário ou duração.');
+    }
     if (startDate != null && endDate != null && endDate.compareTo(startDate) < 0) {
       throw ArgumentError('A data final deve ser posterior à data inicial.');
     }
@@ -151,17 +162,46 @@ extension NutritionRepository on OrvaRepository {
     if (id == null) {
       await execute('''
         INSERT INTO meal_plans(id,title,meal_type,recurrence,planned_date,weekdays_json,start_date,
-          end_date,planned_minute,note,is_active,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+          end_date,planned_minute,duration_minutes,note,is_active,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ''', [newId(),title.trim(),mealType,recurrence,plannedDate,jsonEncode(weekdays.toSet().toList()..sort()),
-        _trimOrNull(startDate),_trimOrNull(endDate),plannedMinute,note.trim(),active?1:0,now,now]);
+        _trimOrNull(startDate),_trimOrNull(endDate),plannedMinute,durationMinutes,note.trim(),active?1:0,now,now]);
     } else {
       await execute('''
         UPDATE meal_plans SET title=?,meal_type=?,recurrence=?,planned_date=?,weekdays_json=?,
-          start_date=?,end_date=?,planned_minute=?,note=?,is_active=?,updated_at=? WHERE id=?
+          start_date=?,end_date=?,planned_minute=?,duration_minutes=?,note=?,is_active=?,updated_at=? WHERE id=?
       ''', [title.trim(),mealType,recurrence,plannedDate,jsonEncode(weekdays.toSet().toList()..sort()),
-        _trimOrNull(startDate),_trimOrNull(endDate),plannedMinute,note.trim(),active?1:0,now,id]);
+        _trimOrNull(startDate),_trimOrNull(endDate),plannedMinute,durationMinutes,note.trim(),active?1:0,now,id]);
     }
+  }
+
+  /// Returns only meals with both a real planned start and explicit
+  /// duration. The returned intervals can enter planned-time aggregation;
+  /// they are not consumption records and do not imply that the meal happened.
+  Future<List<Map<String, Object?>>> getMealPlanTimeBlocksForDate(DateTime date) async {
+    final plans = await getMealPlansForDate(date);
+    final blocks = <Map<String, Object?>>[];
+    for (final plan in plans) {
+      final startValue = plan['planned_minute'];
+      final durationValue = plan['duration_minutes'];
+      if (startValue is! num || durationValue is! num) continue;
+      final start = startValue.toInt();
+      final duration = durationValue.toInt();
+      final end = start + duration;
+      if (start < 0 || start >= 1440 || duration <= 0 || end > 1440) continue;
+      blocks.add({
+        'id': 'meal-plan:${plan['id']}',
+        'meal_plan_id': plan['id'],
+        'title': plan['title'],
+        'category': 'Alimentação',
+        'start_minute': start,
+        'end_minute': end,
+        'block_kind': 'mealPlan',
+        'planned_date': dateKey(date),
+        'meal_type': plan['meal_type'],
+      });
+    }
+    return blocks;
   }
 
   Future<void> setMealPlanActive(String id, bool active) => execute(
