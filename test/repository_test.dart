@@ -2,6 +2,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orva/core/database/app_database.dart';
 import 'package:orva/core/database/orva_repository.dart';
+import 'package:orva/core/database/study_repository.dart';
+import 'package:orva/core/database/nutrition_repository.dart';
+import 'package:orva/core/database/obligations_repository.dart';
 
 void main() {
   late AppDatabase database;
@@ -49,6 +52,172 @@ void main() {
     expect(await repository.getPinHashAndSalt(), isNull);
     expect(await repository.getPinFailedAttempts(), 0);
     expect(await repository.getPinLockoutUntil(), isNull);
+  });
+
+  test('study subjects, topic hierarchy, sessions and reviews persist as real records', () async {
+    await repository.saveGoal(title: 'Estudar Flutter', metricName: 'minutos', targetValue: 600, unit: 'min');
+    final goal = (await repository.getGoals(status: 'active')).single;
+    await repository.saveStudySubject(
+      name: 'Programação',
+      description: 'Aprendizado técnico',
+      goalId: goal['id'] as String,
+    );
+    final subject = (await repository.getStudySubjects()).single;
+    await repository.saveStudyTopic(subjectId: subject['id'] as String, name: 'Flutter');
+    final topic = (await repository.getStudyTopics(subject['id'] as String)).single;
+    await repository.saveStudyTopic(
+      subjectId: subject['id'] as String,
+      parentTopicId: topic['id'] as String,
+      name: 'Riverpod',
+    );
+    await repository.saveStudySession(
+      subjectId: subject['id'] as String,
+      topicId: topic['id'] as String,
+      goalId: goal['id'] as String,
+      sessionDate: DateTime(2026, 10, 13),
+      startMinute: 840,
+      durationMinutes: 75,
+      note: 'Providers e estado',
+    );
+    await repository.saveStudyReview(
+      subjectId: subject['id'] as String,
+      topicId: topic['id'] as String,
+      reviewedAt: DateTime(2026, 10, 13),
+      reviewKind: 'quiz',
+      confidence: 4,
+      note: 'Rever tratamento de erros',
+    );
+
+    final summary = await repository.getStudySummary(
+      from: DateTime(2026, 10, 12),
+      to: DateTime(2026, 10, 18),
+    );
+    expect(summary['sessions'], 1);
+    expect(summary['minutes'], 75);
+    expect(summary['studyDays'], 1);
+    expect(summary['reviews'], 1);
+    expect((await repository.getStudySessions()).single['goal_id'], goal['id']);
+    expect((await repository.getStudyReviews()).single['confidence'], 4);
+    expect((await repository.getStudySubjects()).single['total_minutes'], 75);
+  });
+
+  test('planned meal and consumed meal are separate; nutrition snapshots survive food edits', () async {
+    await repository.saveFood(
+      name: 'Aveia',
+      referenceAmount: 100,
+      referenceUnit: 'g',
+      calories: 380,
+      proteinG: 13,
+      carbohydratesG: 68,
+      nutritionSource: 'Rótulo informado pelo usuário',
+    );
+    final food = (await repository.getFoods()).single;
+    await repository.saveMealPlan(
+      title: 'Café planejado',
+      mealType: 'breakfast',
+      recurrence: 'weekly',
+      weekdays: [2],
+      startDate: '2026-10-13',
+      plannedMinute: 480,
+    );
+    final plan = (await repository.getMealPlansForDate(DateTime(2026, 10, 13))).single;
+    await repository.addMealPlanItem(
+      mealPlanId: plan['id'] as String,
+      foodId: food['id'] as String,
+      quantity: 150,
+    );
+    expect((await repository.getMealPlanItems(plan['id'] as String)).single['calories'], 570);
+
+    await repository.saveFoodConsumption(
+      consumedDate: DateTime(2026, 10, 13),
+      consumedMinute: 495,
+      mealType: 'breakfast',
+      title: 'Café consumido',
+      items: [FoodQuantity(foodId: food['id'] as String, quantity: 150)],
+    );
+    final summary = await repository.getNutritionSummary(DateTime(2026, 10, 13));
+    expect(summary['consumptionCount'], 1);
+    expect(summary['itemCount'], 1);
+    expect(summary['calories'], 570);
+    expect(summary['isPartial'], isTrue);
+
+    await repository.saveFood(
+      id: food['id'] as String,
+      name: 'Aveia atualizada',
+      referenceAmount: 100,
+      referenceUnit: 'g',
+      calories: 100,
+    );
+    final consumption = (await repository.getFoodConsumptionsForDate(DateTime(2026, 10, 13))).single;
+    final snapshot = (await repository.getFoodConsumptionItems(consumption['id'] as String)).single;
+    expect(snapshot['food_name_snapshot'], 'Aveia');
+    expect(snapshot['calories'], 570);
+    expect((await repository.getMealPlansForDate(DateTime(2026, 10, 13))).length, 1);
+  });
+
+  test('overnight obligations split across dates and exceptions affect only one occurrence', () async {
+    await repository.saveObligationRule(
+      name: 'Sono',
+      category: 'Descanso',
+      startMinute: 22 * 60 + 30,
+      endMinute: 7 * 60 + 30,
+      recurrence: 'daily',
+      startDate: DateTime(2026, 10, 12),
+    );
+    final nextDay = DateTime(2026, 10, 13);
+    final blocks = await repository.getObligationTimeBlocksForDate(nextDay);
+    expect(blocks, hasLength(2));
+    expect(blocks.first['start_minute'], 0);
+    expect(blocks.first['end_minute'], 450);
+    expect(blocks.last['start_minute'], 1350);
+    expect(blocks.last['end_minute'], 1440);
+    final totalMinutes = blocks.fold<int>(
+      0,
+      (sum, block) => sum +
+          (block['end_minute'] as num).toInt() -
+          (block['start_minute'] as num).toInt(),
+    );
+    expect(totalMinutes, 540);
+
+    final occurrences = await repository.getObligationOccurrencesForDate(nextDay);
+    final currentOccurrence = occurrences.single;
+    await repository.saveObligationException(
+      ruleId: currentOccurrence['rule_id'] as String,
+      occurrenceDate: nextDay,
+      action: 'skip',
+      note: 'Dia de descanso',
+    );
+    expect((await repository.getObligationOccurrencesForDate(nextDay)).single['status'], 'skipped');
+    final afterException = await repository.getObligationTimeBlocksForDate(nextDay);
+    expect(afterException.where((block) => block['obligation_date'] == '2026-10-13'), isEmpty);
+    expect(afterException.where((block) => block['continues_from_previous_day'] == 1), hasLength(1));
+    await repository.clearObligationException(currentOccurrence['rule_id'] as String, nextDay);
+    expect((await repository.getObligationOccurrencesForDate(nextDay)).single['status'], 'planned');
+  });
+
+  test('version 3 backup imports with new modules empty and old local data intact', () async {
+    await repository.saveNote(title: 'Backup antigo', content: 'Conteúdo preservado');
+    final exported = await repository.exportBackup();
+    final oldBackup = Map<String, dynamic>.from(exported);
+    final data = Map<String, dynamic>.from(exported['data'] as Map);
+    const newTables = [
+      'study_subjects','study_topics','study_sessions','study_reviews',
+      'foods','meal_plans','meal_plan_items','food_consumptions','food_consumption_items',
+      'obligation_rules','obligation_exceptions','obligation_occurrences',
+    ];
+    for (final table in newTables) {
+      data.remove(table);
+    }
+    oldBackup['version'] = 3;
+    oldBackup['data'] = data;
+
+    await repository.saveNote(title: 'Dados posteriores', content: 'Será substituído');
+    await repository.importBackup(oldBackup);
+
+    expect((await repository.getNotes()).single['title'], 'Backup antigo');
+    expect(await repository.getStudySubjects(), isEmpty);
+    expect(await repository.getFoods(), isEmpty);
+    expect(await repository.getObligationRules(), isEmpty);
   });
 
   test('starts without goals, checklists, hobbies, notes or journal entries', () async {
