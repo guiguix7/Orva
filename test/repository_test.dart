@@ -16,6 +16,41 @@ void main() {
     await database.close();
   });
 
+  test('PIN retry limits persist and reset after successful authentication', () async {
+    await repository.setPin(pinHash: 'test-hash', pinSalt: 'test-salt');
+
+    for (var attempt = 0; attempt < 4; attempt++) {
+      expect(await repository.recordPinFailure(), isNull);
+    }
+
+    final before = DateTime.now();
+    final lockout = await repository.recordPinFailure();
+    expect(lockout, isNotNull);
+    expect(lockout!.difference(before).inSeconds, inInclusiveRange(29, 30));
+    expect(await repository.getPinFailedAttempts(), 5);
+    expect(
+      (await repository.getPinLockoutUntil())!.millisecondsSinceEpoch,
+      lockout.millisecondsSinceEpoch,
+    );
+
+    await repository.resetPinFailures();
+    expect(await repository.getPinFailedAttempts(), 0);
+    expect(await repository.getPinLockoutUntil(), isNull);
+  });
+
+  test('disabling local lock clears PIN retry lockout state', () async {
+    await repository.setPin(pinHash: 'test-hash', pinSalt: 'test-salt');
+    for (var attempt = 0; attempt < 5; attempt++) {
+      await repository.recordPinFailure();
+    }
+
+    await repository.disableLock();
+    expect(await repository.isLockEnabled(), isFalse);
+    expect(await repository.getPinHashAndSalt(), isNull);
+    expect(await repository.getPinFailedAttempts(), 0);
+    expect(await repository.getPinLockoutUntil(), isNull);
+  });
+
   test('starts without goals, checklists, hobbies, notes or journal entries', () async {
     expect(await repository.getGoals(), isEmpty);
     expect(await repository.getChecklists(includeTemplates: true), isEmpty);
