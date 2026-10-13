@@ -1,8 +1,15 @@
 plugins {
     id("com.android.application")
-    id("com.google.gms.google-services")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // Firebase options are supplied explicitly by lib/firebase_options.dart.
+    // The Google Services plugin is only needed when the owner supplies the
+    // app-specific google-services.json (for example, for Google Sign-In).
+    id("com.google.gms.google-services") apply false
+    // The Flutter Gradle Plugin must be applied after Android/Kotlin plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+if (file("google-services.json").isFile) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 android {
@@ -49,16 +56,3 @@ flutter {
     source = "../.."
 }
 
-dependencies {
-  // Import the Firebase BoM
-  implementation(platform("com.google.firebase:firebase-bom:35.0.0"))
-
-
-  // TODO: Add the dependencies for Firebase products you want to use
-  // When using the BoM, don't specify versions in Firebase dependencies
-  implementation("com.google.firebase:firebase-analytics")
-
-
-  // Add the dependencies for any other desired Firebase products
-  // https://firebase.google.com/docs/android/setup#available-libraries
-}
