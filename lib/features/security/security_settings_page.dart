@@ -142,10 +142,10 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
   Future<String?> _askPin({required String title, required bool confirm}) async {
     final controller = TextEditingController();
     final confirmController = TextEditingController();
+    String? error;
     final result = await showDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(builder: (context, setDialogState) {
-        String? error;
         return AlertDialog(
           title: Text(title),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -192,6 +192,8 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
         );
       }),
     );
+    controller.dispose();
+    confirmController.dispose();
     return result;
   }
 
