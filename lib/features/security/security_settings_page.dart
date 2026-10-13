@@ -42,7 +42,10 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
     bool biometricAvailable = false;
     try {
       final auth = LocalAuthentication();
-      biometricAvailable = await auth.canCheckBiometrics && await auth.isDeviceSupported();
+      final canCheck = await auth.canCheckBiometrics;
+      final supported = await auth.isDeviceSupported();
+      final enrolled = canCheck && (await auth.getAvailableBiometrics()).isNotEmpty;
+      biometricAvailable = canCheck && supported && enrolled;
     } catch (_) {
       biometricAvailable = false;
     }
