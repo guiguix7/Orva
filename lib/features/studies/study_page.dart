@@ -290,13 +290,11 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     Map<String, Object?>? topic,
   }) async {
     final repo = ref.read(repositoryProvider);
-    final dateController = TextEditingController();
     final duration = TextEditingController(text: '45');
     var date = DateTime.now();
-    var startMinute = (date.hour * 60 + date.minute + 4) ~/ 5 * 5;
-    if (startMinute >= 1440) startMinute = 23 * 60;
+    var startMinute = ((date.hour * 60 + date.minute + 4) ~/ 5) * 5;
+    if (startMinute + 45 > 1440) startMinute = 22 * 60;
     if (!mounted) {
-      dateController.dispose();
       duration.dispose();
       return;
     }
