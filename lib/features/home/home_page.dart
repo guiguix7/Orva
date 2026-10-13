@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/database/orva_repository.dart';
+import '../../core/domain/orva_calculations.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 import '../checklists/checklists_page.dart';
@@ -29,6 +30,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _loading = true;
   String? _userName;
   String? _focus;
+  bool _focusCompleted = false;
   Map<String, Object?> _summary = {};
   List<Map<String, Object?>> _goals = [];
   List<Map<String, Object?>> _items = [];
@@ -60,6 +62,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       final values = await Future.wait<Object?>([
         repo.getSetting('user_name'),
         repo.getSetting('focus_${repo.dateKey(now)}'),
+        repo.getSetting('focus_done_${repo.dateKey(now)}'),
         repo.getTodaySummary(now),
         repo.getGoals(status: 'active'),
         repo.getTodayOccurrenceItems(now),
@@ -70,11 +73,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       setState(() {
         _userName = (values[0] as String?)?.trim();
         _focus = (values[1] as String?)?.trim();
-        _summary = values[2] as Map<String, Object?>;
-        _goals = (values[3] as List<Map<String, Object?>>).take(3).toList();
-        _items = (values[4] as List<Map<String, Object?>>).take(5).toList();
-        _routine = values[5] as List<Map<String, Object?>>;
-        _hobbies = (values[6] as List<Map<String, Object?>>).take(3).toList();
+        _focusCompleted = (values[2] as String?) == '1';
+        _summary = values[3] as Map<String, Object?>;
+        _goals = (values[4] as List<Map<String, Object?>>).take(3).toList();
+        _items = (values[5] as List<Map<String, Object?>>).take(5).toList();
+        _routine = values[6] as List<Map<String, Object?>>;
+        _hobbies = (values[7] as List<Map<String, Object?>>).take(3).toList();
         _loading = false;
         _error = null;
       });
@@ -147,13 +151,33 @@ class _HomePageState extends ConsumerState<HomePage> {
     ));
     controller.dispose();
     if (value == null || !mounted) return;
-    final key = 'focus_${repo.dateKey(DateTime.now())}';
+    final dateKey = repo.dateKey(DateTime.now());
+    final key = 'focus_$dateKey';
+    final completedKey = 'focus_done_$dateKey';
     if (value.isEmpty) {
-      await repo.execute('DELETE FROM settings WHERE setting_key=?', [key]);
+      await repo.execute(
+        'DELETE FROM settings WHERE setting_key IN (?, ?)',
+        [key, completedKey],
+      );
     } else {
       await repo.setSetting(key, value);
+      // Alterar o foco cria uma nova prioridade a concluir.
+      if (value != (_focus ?? '')) await repo.setSetting(completedKey, '0');
     }
     await _load();
+  }
+
+  Future<void> _toggleFocusCompleted() async {
+    if (_focus?.isNotEmpty != true) return;
+    final repo = ref.read(repositoryProvider);
+    final key = 'focus_done_${repo.dateKey(DateTime.now())}';
+    final next = !_focusCompleted;
+    try {
+      await repo.setSetting(key, next ? '1' : '0');
+      if (mounted) setState(() => _focusCompleted = next);
+    } catch (error) {
+      if (mounted) showOrvaError(context, error);
+    }
   }
 
   @override
@@ -162,17 +186,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     final currentName = nameState.hasValue ? nameState.value : _userName;
     final now = DateTime.now();
     final date = DateFormat('EEEE, d MMMM', 'pt_BR').format(now);
-    final greeting = now.hour < 12 ? 'Bom dia' : now.hour < 18 ? 'Boa tarde' : 'Boa noite';
+    final greeting = greetingForHour(now.hour);
     final name = currentName == null || currentName.isEmpty ? '' : ', $currentName';
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _quickAction,
-        backgroundColor: OrvaColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Criar'),
-      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _load,
@@ -181,13 +198,19 @@ class _HomePageState extends ConsumerState<HomePage> {
               : _error != null
                   ? ListView(children: [OrvaEmptyState(icon: Icons.error_outline, title: 'Não foi possível carregar', message: _error!, actionLabel: 'Tentar novamente', onAction: _load)])
                   : ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 100),
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
                       children: [
                         Row(children: [
                           Container(width: 42, height: 42, decoration: BoxDecoration(color: OrvaColors.primary, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.spa_outlined, color: Colors.white, size: 24)),
                           const SizedBox(width: 10),
                           Text('orva', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, letterSpacing: -0.8)),
                           const Spacer(),
+                          IconButton.filledTonal(
+                            tooltip: 'Criar',
+                            onPressed: _quickAction,
+                            icon: const Icon(Icons.add_rounded),
+                          ),
+                          const SizedBox(width: 4),
                           IconButton(tooltip: 'Mais opções', onPressed: () => widget.onNavigate(3), icon: const Icon(Icons.tune_rounded)),
                         ]),
                         const SizedBox(height: 28),
@@ -195,7 +218,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                         const SizedBox(height: 6),
                         Text(_capitalize(date), style: Theme.of(context).textTheme.bodyMedium),
                         const SizedBox(height: 28),
-                        _FocusCard(focus: _focus, onEditFocus: _editFocus, onAddTask: () async { await showAddTodayTaskDialog(context, ref); await _load(); }, onOpenChecklists: () => widget.onNavigate(1)),
+                        _FocusCard(
+                          focus: _focus,
+                          completed: _focusCompleted,
+                          onEditFocus: _editFocus,
+                          onToggleCompleted: _toggleFocusCompleted,
+                        ),
                         const SizedBox(height: 26),
                         OrvaSectionHeader(title: 'Seu dia, em números'),
                         const SizedBox(height: 12),
@@ -270,36 +298,101 @@ class _HomePageState extends ConsumerState<HomePage> {
 String _capitalize(String value) => value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
 
 class _FocusCard extends StatelessWidget {
-  const _FocusCard({required this.focus, required this.onEditFocus, required this.onAddTask, required this.onOpenChecklists});
+  const _FocusCard({
+    required this.focus,
+    required this.completed,
+    required this.onEditFocus,
+    required this.onToggleCompleted,
+  });
+
   final String? focus;
+  final bool completed;
   final VoidCallback onEditFocus;
-  final VoidCallback onAddTask;
-  final VoidCallback onOpenChecklists;
+  final VoidCallback onToggleCompleted;
 
   @override
   Widget build(BuildContext context) {
+    final hasFocus = focus?.trim().isNotEmpty == true;
     return OrvaSurface(
-      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF24332F) : OrvaColors.primary900,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF24332F)
+          : OrvaColors.primary900,
       padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.spa_outlined, color: Color(0xFFB9D6D0), size: 20),
-          const SizedBox(width: 8),
-          Text('FOCO DO DIA', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: const Color(0xFFB9D6D0), letterSpacing: 1.2, fontSize: 11)),
-          const Spacer(),
-          IconButton(onPressed: onEditFocus, tooltip: 'Editar foco', icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFFD7E4E1))),
-        ]),
-        const SizedBox(height: 8),
-        Text(focus?.isNotEmpty == true ? focus! : 'Escolha sua prioridade para hoje.', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontSize: 23)),
-        const SizedBox(height: 7),
-        Text(focus?.isNotEmpty == true ? 'Mantenha essa prioridade visível enquanto organiza o restante do dia.' : 'Este campo é opcional e só aparece depois que você definir um foco.', style: const TextStyle(color: Color(0xFFD7E4E1), height: 1.45)),
-        const SizedBox(height: 18),
-        Row(children: [
-          Expanded(child: FilledButton(onPressed: onAddTask, style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE6F0ED), foregroundColor: OrvaColors.primary900, minimumSize: const Size(0, 46)), child: const Text('Adicionar tarefa'))),
-          const SizedBox(width: 10),
-          IconButton.filledTonal(onPressed: onOpenChecklists, tooltip: 'Abrir checklists', style: IconButton.styleFrom(backgroundColor: const Color(0xFF36534D), foregroundColor: Colors.white, minimumSize: const Size(46, 46)), icon: const Icon(Icons.arrow_forward_rounded)),
-        ]),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.spa_outlined, color: Color(0xFFB9D6D0), size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'FOCO DO DIA',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFFB9D6D0),
+                    letterSpacing: 1.2,
+                    fontSize: 11,
+                  ),
+            ),
+            const Spacer(),
+            if (hasFocus)
+              IconButton(
+                onPressed: onEditFocus,
+                tooltip: 'Editar foco',
+                icon: const Icon(Icons.edit_outlined,
+                    size: 18, color: Color(0xFFD7E4E1)),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          Text(
+            hasFocus
+                ? focus!
+                : 'Qual é a principal coisa que você quer realizar hoje?',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontSize: 23,
+                  decoration: completed ? TextDecoration.lineThrough : null,
+                ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            hasFocus
+                ? (completed
+                    ? 'Foco concluído. Você pode reabri-lo se precisar.'
+                    : 'Seu foco está definido para hoje. Você pode reorganizar as prioridades quando quiser.')
+                : 'Escolha uma prioridade simples para orientar seu dia, no seu ritmo.',
+            style: const TextStyle(color: Color(0xFFD7E4E1), height: 1.45),
+          ),
+          const SizedBox(height: 18),
+          if (!hasFocus)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onEditFocus,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE6F0ED),
+                  foregroundColor: OrvaColors.primary900,
+                  minimumSize: const Size(0, 46),
+                ),
+                child: const Text('Definir foco'),
+              ),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onToggleCompleted,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE6F0ED),
+                  foregroundColor: OrvaColors.primary900,
+                  minimumSize: const Size(0, 46),
+                ),
+                icon: Icon(completed
+                    ? Icons.undo_rounded
+                    : Icons.check_circle_outline_rounded),
+                label: Text(completed ? 'Reabrir foco' : 'Concluir foco'),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
