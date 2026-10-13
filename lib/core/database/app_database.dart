@@ -261,8 +261,6 @@ final class AppDatabase extends GeneratedDatabase {
     )''',
     'CREATE INDEX routine_template_blocks_idx ON routine_template_blocks(template_id, weekday, start_minute)',
   ];
-}
-
 
   /// Local study subjects, hierarchical topics, real sessions and reviews.
   static const List<String> _studySchema = [
@@ -476,3 +474,4 @@ final class AppDatabase extends GeneratedDatabase {
     )''',
     'CREATE INDEX obligation_occurrences_date_idx ON obligation_occurrences(occurrence_date, status)',
   ];
+}
