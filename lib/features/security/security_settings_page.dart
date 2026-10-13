@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../core/database/orva_repository.dart';
+import '../../core/logging/orva_diagnostics.dart';
 import '../../core/security/pin_security.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
@@ -46,7 +47,14 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
       final supported = await auth.isDeviceSupported();
       final enrolled = canCheck && (await auth.getAvailableBiometrics()).isNotEmpty;
       biometricAvailable = canCheck && supported && enrolled;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'biometric-capability',
+        module: 'security',
+        severity: DiagnosticSeverity.warning,
+      );
       biometricAvailable = false;
     }
     if (!mounted) return;
