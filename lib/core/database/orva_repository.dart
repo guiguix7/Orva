@@ -922,7 +922,7 @@ final class OrvaRepository {
       'study_sessions': {'id','subject_id','topic_id','goal_id','session_date','start_minute','duration_minutes','note','created_at','updated_at'},
       'study_reviews': {'id','subject_id','topic_id','reviewed_at','review_kind','confidence','note','created_at'},
       'foods': {'id','name','brand','reference_amount','reference_unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','nutrition_source','note','created_at','updated_at'},
-      'meal_plans': {'id','title','meal_type','recurrence','planned_date','weekdays_json','start_date','end_date','planned_minute','note','is_active','created_at','updated_at'},
+      'meal_plans': {'id','title','meal_type','recurrence','planned_date','weekdays_json','start_date','end_date','planned_minute','duration_minutes','note','is_active','created_at','updated_at'},
       'meal_plan_items': {'id','meal_plan_id','food_id','food_name_snapshot','quantity','unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','order_index'},
       'food_consumptions': {'id','consumed_date','consumed_minute','meal_type','title','note','created_at','updated_at'},
       'food_consumption_items': {'id','consumption_id','food_id','food_name_snapshot','quantity','unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','order_index'},
