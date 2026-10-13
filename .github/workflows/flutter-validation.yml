@@ -10,7 +10,7 @@ on:
       - main
 
 concurrency:
-  group: flutter-validation-${{ github.event.pull_request.head.ref || github.ref }}
+  group: flutter-validation-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
