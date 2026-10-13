@@ -4,10 +4,32 @@ import 'package:drift/drift.dart';
 
 import 'orva_repository.dart';
 
+/// Ingredient input for a planned or consumed meal. Snapshot-backed entries
+/// preserve the original recorded nutrition even if the catalogue later changes.
 class FoodQuantity {
-  const FoodQuantity({required this.foodId, required this.quantity});
-  final String foodId;
+  const FoodQuantity({
+    required this.foodId,
+    required this.quantity,
+    this.snapshotName,
+    this.snapshotUnit,
+    this.snapshotQuantity,
+    this.snapshotCalories,
+    this.snapshotProteinG,
+    this.snapshotCarbohydratesG,
+    this.snapshotFatG,
+    this.snapshotFibreG,
+  });
+
+  final String? foodId;
   final double quantity;
+  final String? snapshotName;
+  final String? snapshotUnit;
+  final double? snapshotQuantity;
+  final Object? snapshotCalories;
+  final Object? snapshotProteinG;
+  final Object? snapshotCarbohydratesG;
+  final Object? snapshotFatG;
+  final Object? snapshotFibreG;
 }
 
 double? _nutritionScale(Object? perReference, double quantity, double referenceAmount) {
@@ -268,44 +290,81 @@ extension NutritionRepository on OrvaRepository {
     if (consumedMinute != null && (consumedMinute < 0 || consumedMinute >= 1440)) {
       throw ArgumentError('Horário de consumo inválido.');
     }
-    final foods = <Map<String,Object?>>[];
+
+    final normalizedItems = <Map<String, Object?>>[];
     for (final item in items) {
       if (!item.quantity.isFinite || item.quantity <= 0) {
         throw ArgumentError('A quantidade de cada alimento precisa ser positiva.');
       }
-      final found = await rows('SELECT * FROM foods WHERE id=?',[Variable.withString(item.foodId)]);
+
+      // When editing an existing record, keep its nutrition snapshot rather
+      // than silently recalculating history against today's food catalogue.
+      if (item.snapshotName != null && item.snapshotUnit != null) {
+        final baseQuantity = item.snapshotQuantity;
+        if (baseQuantity == null || !baseQuantity.isFinite || baseQuantity <= 0) {
+          throw ArgumentError('O snapshot do alimento tem uma quantidade inválida.');
+        }
+        normalizedItems.add({
+          'food_id': item.foodId,
+          'food_name_snapshot': item.snapshotName,
+          'quantity': item.quantity,
+          'unit': item.snapshotUnit,
+          'calories': _nutritionScale(item.snapshotCalories, item.quantity, baseQuantity),
+          'protein_g': _nutritionScale(item.snapshotProteinG, item.quantity, baseQuantity),
+          'carbohydrates_g': _nutritionScale(item.snapshotCarbohydratesG, item.quantity, baseQuantity),
+          'fat_g': _nutritionScale(item.snapshotFatG, item.quantity, baseQuantity),
+          'fibre_g': _nutritionScale(item.snapshotFibreG, item.quantity, baseQuantity),
+        });
+        continue;
+      }
+
+      final foodId = item.foodId;
+      if (foodId == null) {
+        throw ArgumentError('Selecione um alimento do catálogo ou forneça um snapshot preservado.');
+      }
+      final found = await rows('SELECT * FROM foods WHERE id=?', [Variable.withString(foodId)]);
       if (found.isEmpty) throw ArgumentError('Um dos alimentos selecionados não existe mais.');
-      foods.add({...found.first,'_quantity':item.quantity});
+      final food = found.first;
+      final reference = (food['reference_amount'] as num).toDouble();
+      normalizedItems.add({
+        'food_id': food['id'],
+        'food_name_snapshot': food['name'],
+        'quantity': item.quantity,
+        'unit': food['reference_unit'],
+        'calories': _nutritionScale(food['calories'], item.quantity, reference),
+        'protein_g': _nutritionScale(food['protein_g'], item.quantity, reference),
+        'carbohydrates_g': _nutritionScale(food['carbohydrates_g'], item.quantity, reference),
+        'fat_g': _nutritionScale(food['fat_g'], item.quantity, reference),
+        'fibre_g': _nutritionScale(food['fibre_g'], item.quantity, reference),
+      });
     }
-    final now=timestamp();
-    final consumptionId=id??newId();
+
+    final now = timestamp();
+    final consumptionId = id ?? newId();
     await db.transaction(() async {
       if (id == null) {
         await execute('''
           INSERT INTO food_consumptions(id,consumed_date,consumed_minute,meal_type,title,note,created_at,updated_at)
           VALUES(?,?,?,?,?,?,?,?)
-        ''',[consumptionId,dateKey(consumedDate),consumedMinute,mealType,title.trim(),note.trim(),now,now]);
+        ''', [consumptionId,dateKey(consumedDate),consumedMinute,mealType,title.trim(),note.trim(),now,now]);
       } else {
         await execute('''
           UPDATE food_consumptions SET consumed_date=?,consumed_minute=?,meal_type=?,title=?,note=?,updated_at=?
           WHERE id=?
-        ''',[dateKey(consumedDate),consumedMinute,mealType,title.trim(),note.trim(),now,consumptionId]);
-        await execute('DELETE FROM food_consumption_items WHERE consumption_id=?',[consumptionId]);
+        ''', [dateKey(consumedDate),consumedMinute,mealType,title.trim(),note.trim(),now,consumptionId]);
+        await execute('DELETE FROM food_consumption_items WHERE consumption_id=?', [consumptionId]);
       }
-      for (var i=0;i<foods.length;i++) {
-        final food=foods[i];
-        final quantity=food['_quantity'] as double;
-        final reference=(food['reference_amount'] as num).toDouble();
+      for (var i = 0; i < normalizedItems.length; i++) {
+        final item = normalizedItems[i];
         await execute('''
           INSERT INTO food_consumption_items(id,consumption_id,food_id,food_name_snapshot,quantity,unit,
             calories,protein_g,carbohydrates_g,fat_g,fibre_g,order_index)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-        ''',[newId(),consumptionId,food['id'],food['name'],quantity,food['reference_unit'],
-          _nutritionScale(food['calories'],quantity,reference),
-          _nutritionScale(food['protein_g'],quantity,reference),
-          _nutritionScale(food['carbohydrates_g'],quantity,reference),
-          _nutritionScale(food['fat_g'],quantity,reference),
-          _nutritionScale(food['fibre_g'],quantity,reference),i]);
+        ''', [
+          newId(),consumptionId,item['food_id'],item['food_name_snapshot'],item['quantity'],
+          item['unit'],item['calories'],item['protein_g'],item['carbohydrates_g'],item['fat_g'],
+          item['fibre_g'],i,
+        ]);
       }
     });
   }
