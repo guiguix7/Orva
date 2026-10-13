@@ -371,6 +371,33 @@ extension NutritionRepository on OrvaRepository {
 
   Future<void> deleteFoodConsumption(String id) => execute('DELETE FROM food_consumptions WHERE id=?',[id]);
 
+  Future<Map<String, Object?>> getPlannedNutritionSummary(DateTime date) async {
+    final plans = await getMealPlansForDate(date);
+    final items = <Map<String, Object?>>[];
+    for (final plan in plans) {
+      items.addAll(await getMealPlanItems(plan['id'] as String));
+    }
+    final result = <String, Object?>{
+      'planCount': plans.length,
+      'itemCount': items.length,
+    };
+    for (final nutrient in const [
+      'calories',
+      'protein_g',
+      'carbohydrates_g',
+      'fat_g',
+      'fibre_g',
+    ]) {
+      result[nutrient] = _nutrientTotal(items, nutrient);
+      result['${nutrient}Missing'] =
+          items.where((item) => item[nutrient] == null).length;
+    }
+    result['isPartial'] = items.any((item) =>
+        const ['calories', 'protein_g', 'carbohydrates_g', 'fat_g']
+            .any((key) => item[key] == null));
+    return result;
+  }
+
   Future<Map<String,Object?>> getNutritionSummary(DateTime date) async {
     final items=await rows('''
       SELECT i.* FROM food_consumption_items i
