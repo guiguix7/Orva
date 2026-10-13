@@ -369,7 +369,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
             }),
           ),
           const SizedBox(height: 8),
-          TextField(controller: quantity, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantidade na unidade de referência')),
+          TextField(controller: quantity, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'Quantidade (${_foods.firstWhere((food) => food['id'] == foodId)['reference_unit']})')),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancelar')),
