@@ -103,6 +103,27 @@ void main() {
     expect(notes.single['content'], 'Conteúdo local');
   });
 
+  test('backup export excludes local PIN and lockout metadata and import preserves it', () async {
+    await repository.setSetting('security_pin_hash', 'local-hash-only');
+    await repository.setSetting('security_pin_salt', 'local-salt-only');
+    await repository.setSetting('security_failed_pin_attempts', '4');
+    await repository.setSetting('security_pin_lock_until', '2026-10-13T12:00:00.000');
+
+    final backup = await repository.exportBackup();
+    final data = backup['data'] as Map<String, Object?>;
+    final rows = data['settings'] as List<Map<String, Object?>>;
+    final keys = rows.map((row) => row['setting_key']).toList();
+    expect(keys, isNot(contains('security_pin_hash')));
+    expect(keys, isNot(contains('security_pin_salt')));
+    expect(keys, isNot(contains('security_failed_pin_attempts')));
+    expect(keys, isNot(contains('security_pin_lock_until')));
+
+    await repository.importBackup(backup);
+    expect(await repository.getSetting('security_pin_hash'), 'local-hash-only');
+    expect(await repository.getSetting('security_failed_pin_attempts'), '4');
+    expect(await repository.getSetting('security_pin_lock_until'), '2026-10-13T12:00:00.000');
+  });
+
   test('invalid backups are rejected without changing existing local records', () async {
     await repository.saveNote(title: 'Não apagar', content: 'Registro local');
 
