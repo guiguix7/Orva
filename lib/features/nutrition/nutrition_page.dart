@@ -396,13 +396,34 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
   }
 
   Future<void> _logConsumption([Map<String, Object?>? plan]) async {
+    final repo = ref.read(repositoryProvider);
+    final suggestions = <FoodQuantity>[];
+    if (plan != null) {
+      try {
+        final plannedItems = await repo.getMealPlanItems(plan['id'] as String);
+        for (final item in plannedItems) {
+          final foodId = item['food_id'] as String?;
+          final quantity = item['quantity'];
+          if (foodId != null &&
+              quantity is num &&
+              _foods.any((food) => food['id'] == foodId)) {
+            suggestions.add(FoodQuantity(foodId: foodId, quantity: quantity.toDouble()));
+          }
+        }
+      } catch (error) {
+        if (mounted) showOrvaError(context, error);
+        return;
+      }
+    }
+    if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => _FoodConsumptionDialog(
-        repository: ref.read(repositoryProvider),
+        repository: repo,
         foods: _foods,
         date: _date,
         plannedMeal: plan,
+        suggestedItems: suggestions,
       ),
     );
     if (ok == true && mounted) await _load();
@@ -673,11 +694,13 @@ class _FoodConsumptionDialog extends StatefulWidget {
     required this.foods,
     required this.date,
     this.plannedMeal,
+    this.suggestedItems = const [],
   });
   final OrvaRepository repository;
   final List<Map<String,Object?>> foods;
   final DateTime date;
   final Map<String,Object?>? plannedMeal;
+  final List<FoodQuantity> suggestedItems;
   @override
   State<_FoodConsumptionDialog> createState()=>_FoodConsumptionDialogState();
 }
@@ -697,6 +720,7 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
   void initState(){
     super.initState();
     _mealType=widget.plannedMeal?['meal_type'] as String? ?? 'custom';
+    _items.addAll(widget.suggestedItems);
     if(widget.foods.isNotEmpty){_foodId=widget.foods.first['id'] as String;_quantity.text='${widget.foods.first['reference_amount']}';}
     final now=DateTime.now();
     _minute=DateUtils.isSameDay(_date,now)?now.hour*60+now.minute:null;
@@ -768,6 +792,16 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
           label:Text(_minute==null?'Adicionar horário':'Horário: ${formatClock(_minute!)}'),
         ),
         const Divider(height:20),
+        if (widget.suggestedItems.isNotEmpty) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Itens sugeridos do planejamento. Confira e ajuste para refletir o que realmente consumiu.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         Align(alignment:Alignment.centerLeft,child:Text('Alimentos da refeição',style:Theme.of(context).textTheme.titleSmall)),
         const SizedBox(height:6),
         if(widget.foods.isEmpty)
