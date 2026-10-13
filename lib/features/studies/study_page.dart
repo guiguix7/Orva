@@ -638,6 +638,14 @@ class _StudyPageState extends ConsumerState<StudyPage> {
                         Text(formatMinutes(intValue(s['duration_minutes'])), style: Theme.of(context).textTheme.bodyMedium),
                         if ((s['note'] as String?)?.isNotEmpty == true) Text(s['note'] as String),
                       ])),
+                      IconButton(
+                        tooltip: 'Editar sessão',
+                        onPressed: _archived || !_subjects.any((subject) =>
+                          subject['id'] == s['subject_id'] && intValue(subject['is_active']) == 1)
+                            ? null
+                            : () => _logSession(session: s),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
                       IconButton(tooltip: 'Excluir sessão', onPressed: () async {
                         final yes = await confirmAction(context, title: 'Excluir sessão?', message: 'O tempo será removido do histórico de estudo.', actionLabel: 'Excluir', destructive: true);
                         if (yes && mounted) { await ref.read(repositoryProvider).deleteStudySession(s['id'] as String); await _load(); }
