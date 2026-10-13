@@ -905,8 +905,8 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
             return ListTile(
               dense:true,
               contentPadding:EdgeInsets.zero,
-              title:Text(food?['name'] as String? ?? 'Alimento removido'),
-              subtitle:Text('${entry.value.quantity} ${food?['reference_unit']??''}'),
+              title:Text(food?['name'] as String? ?? entry.value.snapshotName ?? 'Alimento removido'),
+              subtitle:Text('${entry.value.quantity} ${food?['reference_unit'] ?? entry.value.snapshotUnit ?? ''}'),
               trailing:IconButton(tooltip:'Remover item',onPressed:()=>setState(() { _items.removeAt(entry.key); }),icon:const Icon(Icons.close)),
             );
           }),
