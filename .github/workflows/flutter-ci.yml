@@ -9,6 +9,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: flutter-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
