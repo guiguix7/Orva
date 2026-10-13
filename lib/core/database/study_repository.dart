@@ -85,7 +85,7 @@ extension StudyRepository on OrvaRepository {
         throw ArgumentError('Escolha um assunto pai da mesma matéria.');
       }
       // Prevent a cycle when moving an existing topic under one of its descendants.
-      var cursor = parentTopicId;
+      String? cursor = parentTopicId;
       final visited = <String>{};
       while (cursor != null) {
         if (cursor == id) throw ArgumentError('Um assunto não pode ser filho de si próprio.');
