@@ -65,6 +65,11 @@ class _LockScreenState extends ConsumerState<LockScreen> {
         setState(() => _error = 'PIN incorreto.');
         _controller.clear();
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Não foi possível verificar o PIN agora. Tente novamente.');
+        _controller.clear();
+      }
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -73,7 +78,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: OrvaColors.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -81,8 +86,8 @@ class _LockScreenState extends ConsumerState<LockScreen> {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Container(
                 width: 58, height: 58,
-                decoration: BoxDecoration(color: OrvaColors.primary, borderRadius: BorderRadius.circular(18)),
-                child: const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 26),
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(18)),
+                child: Icon(Icons.lock_outline_rounded, color: Theme.of(context).colorScheme.onPrimary, size: 26),
               ),
               const SizedBox(height: 20),
               Text('Orva está bloqueado', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
