@@ -195,3 +195,8 @@ Esta revisão incremental aplica correções sobre a base existente, sem recriar
 - **Testes adicionados:** limites da saudação, compatibilidade dos hashes antigos, geração/verificação PBKDF2, persistência de tentativas e limpeza do bloqueio.
 
 **Validação pendente:** os testes Flutter, a análise estática e o build Android precisam ser executados em um ambiente com Flutter/Dart e Android SDK. A biometria, o retorno do background e o gesto físico de voltar também exigem validação em emulador/dispositivo; não devem ser considerados comprovados apenas por estas alterações de código.
+
+
+- **Console de diagnóstico:** nova tela disponível em Mais somente em builds de desenvolvimento; captura erros Flutter/Dart, falhas de banco e de desbloqueio local, com filtros, busca, limite de 500 eventos em memória, limpeza e exportação. Mensagens de exceção arbitrárias não são exportadas; tokens, PINs e e-mails têm redatores adicionais.
+- **Ocupação do tempo:** gráfico e lista de categorias são apresentados lado a lado em áreas largas e empilhados em telas estreitas, mantendo os horários sobrepostos contados uma única vez.
+- **Testes adicionais:** sanitização de tokens/e-mails, omissão de detalhes privados de exceções e limite de histórico do console. Os testes foram escritos, mas não executados neste ambiente sem Flutter/Dart.
