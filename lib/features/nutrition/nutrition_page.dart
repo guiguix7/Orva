@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -199,7 +201,12 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
     Set<int> weekdays = {};
     try {
       final raw = plan?['weekdays_json'] as String?;
-      if (raw != null) weekdays = (List<int>.from((raw.isEmpty ? [] : (raw == '[]' ? [] : __parseDays(raw))))).toSet();
+      if (raw != null) {
+        weekdays = (jsonDecode(raw) as List)
+            .whereType<num>()
+            .map((value) => value.toInt())
+            .toSet();
+      }
     } catch (_) {}
     if (weekdays.isEmpty) weekdays = {_date.weekday};
     if (!mounted) { title.dispose(); note.dispose(); return; }
@@ -296,7 +303,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
   Future<void> _addPlanItem(Map<String, Object?> plan) async {
     if (_foods.isEmpty) { showOrvaMessage(context, 'Cadastre pelo menos um alimento antes de adicionar itens ao plano.'); return; }
     var foodId = _foods.first['id'] as String;
-    final quantity = TextEditingController(text: '1');
+    final quantity = TextEditingController(text: '${_foods.first['reference_amount']}');
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialog) => StatefulBuilder(builder: (context, setDialog) => AlertDialog(
@@ -307,7 +314,11 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Alimento'),
             items: _foods.map((f) => DropdownMenuItem(value: f['id'] as String, child: Text('${f['name']}', overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: (v) => setDialog(() => foodId = v ?? foodId),
+            onChanged: (v) => setDialog(() {
+              foodId = v ?? foodId;
+              final food = _foods.where((item) => item['id'] == foodId).first;
+              quantity.text = '${food['reference_amount']}';
+            }),
           ),
           const SizedBox(height: 8),
           TextField(controller: quantity, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantidade na unidade de referência')),
@@ -720,10 +731,10 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
             decoration:const InputDecoration(labelText:'Alimento cadastrado'),
             items:widget.foods.map((f)=>DropdownMenuItem(value:f['id'] as String,child:Text('${f['name']} · por ${f['reference_amount']} ${f['reference_unit']}',overflow:TextOverflow.ellipsis))).toList(),
             onChanged:(v){
-              setState(()=>{
-                _foodId=v??_foodId;
-                final food=_selectedFood;
-                if(food!=null)_quantity.text='${food['reference_amount']}';
+              setState(() {
+                _foodId = v ?? _foodId;
+                final food = _selectedFood;
+                if (food != null) _quantity.text = '${food['reference_amount']}';
               });
             },
           ),
@@ -734,13 +745,16 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
             FilledButton.tonal(onPressed:_addFood,child:const Text('Adicionar')),
           ]),
           ..._items.asMap().entries.map((entry){
-            final food=widget.foods.where((f)=>f['id']==entry.value.foodId).firstOrNull;
+            Map<String,Object?>? food;
+            for (final candidate in widget.foods) {
+              if (candidate['id'] == entry.value.foodId) { food = candidate; break; }
+            }
             return ListTile(
               dense:true,
               contentPadding:EdgeInsets.zero,
               title:Text(food?['name'] as String? ?? 'Alimento removido'),
               subtitle:Text('${entry.value.quantity} ${food?['reference_unit']??''}'),
-              trailing:IconButton(tooltip:'Remover item',onPressed:()=>setState(()=>_items.removeAt(entry.key)),icon:const Icon(Icons.close)),
+              trailing:IconButton(tooltip:'Remover item',onPressed:()=>setState(() { _items.removeAt(entry.key); }),icon:const Icon(Icons.close)),
             );
           }),
         ],
@@ -753,23 +767,6 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
       FilledButton(onPressed:_saving?null:_save,child:_saving?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Text('Salvar consumo')),
     ],
   );
-}
-
-List<dynamic> __parseDays(String raw) => List<dynamic>.from(__decodeDays(raw));
-List<dynamic> __decodeDays(String raw) {
-  final value = raw.trim();
-  if (value.isEmpty || value == '[]') return const [];
-  return List<dynamic>.from(_jsonDecodeList(value));
-}
-
-List<dynamic> _jsonDecodeList(String raw) {
-  // Parse only this small user-owned integer-list field.
-  final result = <int>[];
-  for (final part in raw.replaceAll('[','').replaceAll(']','').split(',')) {
-    final value = int.tryParse(part.trim());
-    if (value != null) result.add(value);
-  }
-  return result;
 }
 
 String _dateKey(DateTime date)=>'${date.year.toString().padLeft(4,'0')}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
