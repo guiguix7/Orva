@@ -68,3 +68,14 @@ bool isNightTheme(DateTime localTime, {int dayStartHour = 7, int nightStartHour 
   final nightStart = nightStartHour * 60;
   return minute < dayStart || minute >= nightStart;
 }
+
+/// Local-time greeting used by the Home. The night interval deliberately
+/// covers midnight through 04:59 instead of treating it as morning.
+String greetingForHour(int hour) {
+  if (hour < 0 || hour > 23) {
+    throw RangeError.range(hour, 0, 23, 'hour');
+  }
+  if (hour >= 5 && hour < 12) return 'Bom dia';
+  if (hour >= 12 && hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
