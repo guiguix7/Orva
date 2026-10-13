@@ -95,11 +95,19 @@ class _LockScreenState extends ConsumerState<LockScreen> {
       }
 
       if (PinSecurity.verify(_controller.text, stored.hash, stored.salt)) {
-        await repo.resetPinFailures();
-        // Upgrade legacy hashes only after the original PIN was verified.
-        if (PinSecurity.needsUpgrade(stored.hash)) {
-          final salt = PinSecurity.generateSalt();
-          await repo.setPin(pinHash: PinSecurity.hash(_controller.text, salt), pinSalt: salt);
+        // A correct PIN must still unlock if a maintenance write fails. Retry
+        // counters and legacy-hash upgrades are best-effort after verification.
+        try {
+          await repo.resetPinFailures();
+          if (PinSecurity.needsUpgrade(stored.hash)) {
+            final salt = PinSecurity.generateSalt();
+            await repo.setPin(
+              pinHash: PinSecurity.hash(_controller.text, salt),
+              pinSalt: salt,
+            );
+          }
+        } catch (_) {
+          // The original hash remains verifiable on the next attempt.
         }
         if (mounted) widget.onUnlocked();
       } else {
