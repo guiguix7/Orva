@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_database.dart';
 import '../domain/orva_calculations.dart';
+import '../logging/orva_diagnostics.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final database = AppDatabase();
@@ -36,11 +37,33 @@ final class OrvaRepository {
     String sql, [
     List<Variable<Object>> variables = const [],
   ]) async {
-    final result = await db.customSelect(sql, variables: variables).get();
-    return result.map((row) => Map<String, Object?>.from(row.data)).toList();
+    try {
+      final result = await db.customSelect(sql, variables: variables).get();
+      return result.map((row) => Map<String, Object?>.from(row.data)).toList();
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'query',
+        module: 'database',
+      );
+      rethrow;
+    }
   }
 
-  Future<void> execute(String sql, [List<Object?> args = const []]) => db.customStatement(sql, args);
+  Future<void> execute(String sql, [List<Object?> args = const []]) async {
+    try {
+      await db.customStatement(sql, args);
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'statement',
+        module: 'database',
+      );
+      rethrow;
+    }
+  }
 
   Future<String?> getSetting(String key) async {
     final result = await rows('SELECT setting_value FROM settings WHERE setting_key = ?', [Variable.withString(key)]);
