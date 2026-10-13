@@ -792,8 +792,8 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
     if(widget.foods.isNotEmpty){_foodId=widget.foods.first['id'] as String;_quantity.text='${widget.foods.first['reference_amount']}';}
     final now=DateTime.now();
     final storedMinute = widget.existingConsumption?['consumed_minute'];
-    _minute = storedMinute is num
-        ? storedMinute.toInt()
+    _minute = widget.existingConsumption != null
+        ? (storedMinute is num ? storedMinute.toInt() : null)
         : DateUtils.isSameDay(_date,now) ? now.hour*60+now.minute : null;
   }
 
