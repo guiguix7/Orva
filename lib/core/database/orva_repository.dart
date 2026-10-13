@@ -729,6 +729,8 @@ final class OrvaRepository {
     'security_pin_salt',
     'security_lock_enabled',
     'security_biometric_enabled',
+    'security_failed_pin_attempts',
+    'security_pin_lock_until',
   };
 
   Future<Map<String, Object?>> exportBackup() async {
