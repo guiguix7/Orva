@@ -154,6 +154,10 @@ void main() {
       quantity: 150,
     );
     expect((await repository.getMealPlanItems(plan['id'] as String)).single['calories'], 570);
+    final plannedSummary = await repository.getPlannedNutritionSummary(DateTime(2026, 10, 13));
+    expect(plannedSummary['planCount'], 2);
+    expect(plannedSummary['itemCount'], 1);
+    expect(plannedSummary['calories'], 570);
 
     await repository.saveFoodConsumption(
       consumedDate: DateTime(2026, 10, 13),
