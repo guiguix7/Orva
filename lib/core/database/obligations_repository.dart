@@ -7,7 +7,7 @@ import 'orva_repository.dart';
 DateTime _obligationDateOnly(DateTime date) => DateTime(date.year,date.month,date.day);
 bool _minuteRangeWraps(int start,int end)=>end<start;
 bool _obligationMatches(Map<String,Object?> rule,DateTime date){
-  final key='\u0024{date.year.toString().padLeft(4,'0')}-\u0024{date.month.toString().padLeft(2,'0')}-\u0024{date.day.toString().padLeft(2,'0')}';
+  final key='${date.year.toString().padLeft(4,'0')}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
   final start=rule['start_date'] as String;
   final end=rule['end_date'] as String?;
   if(key.compareTo(start)<0 || (end!=null && key.compareTo(end)>0)) return false;
