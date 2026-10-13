@@ -35,9 +35,9 @@ class _LockScreenState extends ConsumerState<LockScreen> {
   }
 
   Future<void> _maybeTryBiometric() async {
-    final repo = ref.read(repositoryProvider);
-    if (!await repo.isBiometricEnabled()) return;
     try {
+      final repo = ref.read(repositoryProvider);
+      if (!await repo.isBiometricEnabled()) return;
       final auth = LocalAuthentication();
       final ok = await auth.authenticate(
         localizedReason: 'Desbloqueie o Orva',
@@ -45,7 +45,8 @@ class _LockScreenState extends ConsumerState<LockScreen> {
       );
       if (ok && mounted) widget.onUnlocked();
     } catch (_) {
-      // Biometria indisponível/erro: o usuário simplesmente usa o PIN abaixo.
+      // Falha ao ler a preferência, ausência de hardware ou cancelamento
+      // nunca deve impedir o uso do PIN abaixo.
     }
   }
 
