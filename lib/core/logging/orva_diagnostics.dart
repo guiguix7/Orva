@@ -92,7 +92,9 @@ class OrvaDiagnostics extends ChangeNotifier {
       severity: severity,
       category: category,
       module: module,
-      message: error.runtimeType.toString() + ': ' + error.toString(),
+      // Arbitrary exception text may contain diary, health, task or account data.
+      // Keep the exception class and stack location, not user-controlled details.
+      message: error.runtimeType.toString() + ': detalhes omitidos para proteger dados pessoais',
       stackTrace: stackTrace,
     );
   }
