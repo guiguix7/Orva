@@ -31,6 +31,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   String? _userName;
   String? _focus;
   bool _focusCompleted = false;
+  String? _loadedDateKey;
   Map<String, Object?> _summary = {};
   List<Map<String, Object?>> _goals = [];
   List<Map<String, Object?>> _items = [];
@@ -47,7 +48,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void didUpdateWidget(covariant HomePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.refreshSignal != widget.refreshSignal) _load();
+    if (oldWidget.refreshSignal != widget.refreshSignal) {
+      _load();
+      return;
+    }
+    // Home can stay mounted in IndexedStack through midnight. Refresh the
+    // date-scoped focus, checklist and schedule as soon as the day changes.
+    final today = ref.read(repositoryProvider).dateKey(DateTime.now());
+    if (_loadedDateKey != today) _load();
   }
 
   Future<void> _openPage(Widget page) async {
@@ -71,6 +79,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ]);
       if (!mounted) return;
       setState(() {
+        _loadedDateKey = repo.dateKey(now);
         _userName = (values[0] as String?)?.trim();
         _focus = (values[1] as String?)?.trim();
         _focusCompleted = (values[2] as String?) == '1';
