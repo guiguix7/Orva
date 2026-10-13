@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../core/database/orva_repository.dart';
+import '../../core/logging/orva_diagnostics.dart';
 import '../../core/security/pin_security.dart';
 import '../../core/theme/orva_theme.dart';
 
@@ -59,7 +60,14 @@ class _LockScreenState extends ConsumerState<LockScreen> {
         }
         if (mounted) widget.onUnlocked();
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'biometric-authentication',
+        module: 'security',
+        severity: DiagnosticSeverity.warning,
+      );
       // In case of unsupported hardware, cancellation or plugin failure the
       // PIN remains available as a genuine fallback.
       if (mounted && _error == null) {
@@ -118,6 +126,12 @@ class _LockScreenState extends ConsumerState<LockScreen> {
         }
         if (mounted) widget.onUnlocked();
       } else {
+        OrvaDiagnostics.instance.record(
+          severity: DiagnosticSeverity.warning,
+          category: 'pin-authentication',
+          module: 'security',
+          message: 'PIN incorreto; valor digitado não foi registrado.',
+        );
         _controller.clear();
         final newLockout = await repo.recordPinFailure();
         final attempts = await repo.getPinFailedAttempts();
@@ -126,7 +140,13 @@ class _LockScreenState extends ConsumerState<LockScreen> {
             : 'Muitas tentativas. Tente novamente em ${_formatWait(newLockout.difference(DateTime.now()))}.';
         if (mounted) setState(() => _error = message);
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'pin-authentication',
+        module: 'security',
+      );
       if (mounted) {
         setState(() => _error = 'Não foi possível validar o PIN. Tente novamente.');
       }
