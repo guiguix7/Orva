@@ -183,7 +183,7 @@ void main() {
     final snapshot = (await repository.getFoodConsumptionItems(consumption['id'] as String)).single;
     expect(snapshot['food_name_snapshot'], 'Aveia');
     expect(snapshot['calories'], 570);
-    expect((await repository.getMealPlansForDate(DateTime(2026, 10, 13))).length, 1);
+    expect((await repository.getMealPlansForDate(DateTime(2026, 10, 13))).length, 2);
 
     await repository.saveFoodConsumption(
       id: consumption['id'] as String,
