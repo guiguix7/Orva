@@ -29,7 +29,7 @@ class PinSecurity {
       salt: utf8.encode(salt),
       iterations: _iterations,
     );
-    return '$_algorithm\$_iterations\${_hex(key)}';
+    return '$_algorithm\$$_iterations\$${_hex(key)}';
   }
 
   static bool verify(String pin, String storedHash, String storedSalt) {
