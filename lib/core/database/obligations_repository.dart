@@ -79,17 +79,44 @@ extension ObligationsRepository on OrvaRepository {
         _dateKeyForObligation(startDate),endDate==null?null:_dateKeyForObligation(endDate),
         priority,active?1:0,now,now]);
     }else{
-      await execute('''
-        UPDATE obligation_rules SET name=?,category=?,start_minute=?,end_minute=?,recurrence=?,weekdays_json=?,
-          start_date=?,end_date=?,priority=?,is_active=?,updated_at=? WHERE id=?
-      ''',[name.trim(),category.trim(),startMinute,endMinute,recurrence,jsonEncode(days),
-        _dateKeyForObligation(startDate),endDate==null?null:_dateKeyForObligation(endDate),
-        priority,active?1:0,now,id]);
+      await db.transaction(() async {
+        await execute('''
+          UPDATE obligation_rules SET name=?,category=?,start_minute=?,end_minute=?,recurrence=?,weekdays_json=?,
+            start_date=?,end_date=?,priority=?,is_active=?,updated_at=? WHERE id=?
+        ''',[name.trim(),category.trim(),startMinute,endMinute,recurrence,jsonEncode(days),
+          _dateKeyForObligation(startDate),endDate==null?null:_dateKeyForObligation(endDate),
+          priority,active?1:0,now,id]);
+        // Future uncompleted projections without an explicit exception are a
+        // cache, not history. Remove them so they are regenerated from the
+        // updated rule on demand; completed and exception snapshots remain.
+        await execute('''
+          DELETE FROM obligation_occurrences
+          WHERE rule_id=? AND occurrence_date>=? AND status='planned'
+            AND NOT EXISTS (
+              SELECT 1 FROM obligation_exceptions e
+              WHERE e.rule_id=obligation_occurrences.rule_id
+                AND e.occurrence_date=obligation_occurrences.occurrence_date
+            )
+        ''',[id,_dateKeyForObligation(DateTime.now())]);
+      });
     }
   }
 
-  Future<void> setObligationRuleActive(String id,bool active) =>
-    execute('UPDATE obligation_rules SET is_active=?,updated_at=? WHERE id=?',[active?1:0,timestamp(),id]);
+  Future<void> setObligationRuleActive(String id,bool active) async {
+    await db.transaction(() async {
+      await execute('UPDATE obligation_rules SET is_active=?,updated_at=? WHERE id=?',[active?1:0,timestamp(),id]);
+      if (!active) {
+        // Pausing a rule removes future schedule projections, while keeping
+        // completed occurrences and the recorded history untouched.
+        await execute('''
+          DELETE FROM obligation_occurrences
+          WHERE rule_id=? AND occurrence_date>=? AND status!='completed'
+        ''',[id,_dateKeyForObligation(DateTime.now())]);
+        await execute('DELETE FROM obligation_exceptions WHERE rule_id=? AND occurrence_date>=?',
+          [id,_dateKeyForObligation(DateTime.now())]);
+      }
+    });
+  }
 
   Future<void> saveObligationException({
     required String ruleId,
@@ -261,7 +288,7 @@ extension ObligationsRepository on OrvaRepository {
   Future<void> setObligationOccurrenceCompleted(String occurrenceId,bool completed) async{
     final found=await rows('SELECT status FROM obligation_occurrences WHERE id=?',[Variable.withString(occurrenceId)]);
     if(found.isEmpty) throw ArgumentError('Ocorrência não encontrada.');
-    if(found.first['status']=='skipped' && completed) throw StateError('Remova a exceção antes de concluir uma ocorrência dispensada.');
+    if(found.first['status']=='skipped') throw StateError('Remova a exceção antes de alterar uma ocorrência dispensada.');
     await execute('UPDATE obligation_occurrences SET status=?,updated_at=? WHERE id=?',
       [completed?'completed':'planned',timestamp(),occurrenceId]);
   }
