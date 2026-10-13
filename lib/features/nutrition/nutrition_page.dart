@@ -407,7 +407,18 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
           if (foodId != null &&
               quantity is num &&
               _foods.any((food) => food['id'] == foodId)) {
-            suggestions.add(FoodQuantity(foodId: foodId, quantity: quantity.toDouble()));
+            suggestions.add(FoodQuantity(
+              foodId: foodId,
+              quantity: quantity.toDouble(),
+              snapshotName: item['food_name_snapshot'] as String?,
+              snapshotUnit: item['unit'] as String?,
+              snapshotQuantity: quantity.toDouble(),
+              snapshotCalories: item['calories'],
+              snapshotProteinG: item['protein_g'],
+              snapshotCarbohydratesG: item['carbohydrates_g'],
+              snapshotFatG: item['fat_g'],
+              snapshotFibreG: item['fibre_g'],
+            ));
           }
         }
       } catch (error) {
@@ -427,6 +438,39 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
       ),
     );
     if (ok == true && mounted) await _load();
+  }
+
+  Future<void> _editConsumption(Map<String, Object?> meal) async {
+    try {
+      final repo = ref.read(repositoryProvider);
+      final rows = await repo.getFoodConsumptionItems(meal['id'] as String);
+      final snapshots = rows.map((item) => FoodQuantity(
+        foodId: item['food_id'] as String?,
+        quantity: (item['quantity'] as num).toDouble(),
+        snapshotName: item['food_name_snapshot'] as String?,
+        snapshotUnit: item['unit'] as String?,
+        snapshotQuantity: (item['quantity'] as num).toDouble(),
+        snapshotCalories: item['calories'],
+        snapshotProteinG: item['protein_g'],
+        snapshotCarbohydratesG: item['carbohydrates_g'],
+        snapshotFatG: item['fat_g'],
+        snapshotFibreG: item['fibre_g'],
+      )).toList();
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => _FoodConsumptionDialog(
+          repository: repo,
+          foods: _foods,
+          date: _date,
+          existingConsumption: meal,
+          suggestedItems: snapshots,
+        ),
+      );
+      if (ok == true && mounted) await _load();
+    } catch (error) {
+      if (mounted) showOrvaError(context, error);
+    }
   }
 
   Future<void> _deleteFood(Map<String, Object?> food) async {
@@ -629,7 +673,21 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
           },
         ),
         if((meal['note'] as String?)?.isNotEmpty==true) Align(alignment:Alignment.centerLeft,child:Text(meal['note'] as String)),
-        Align(alignment:Alignment.centerRight,child:TextButton.icon(onPressed:()=>_deleteConsumption(meal),icon:const Icon(Icons.delete_outline,size:18),label:const Text('Excluir registro'))),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Wrap(spacing: 8, children: [
+            TextButton.icon(
+              onPressed: () => _editConsumption(meal),
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Editar registro'),
+            ),
+            TextButton.icon(
+              onPressed: () => _deleteConsumption(meal),
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('Excluir registro'),
+            ),
+          ]),
+        ),
       ],
     )),
   );
@@ -694,24 +752,34 @@ class _FoodConsumptionDialog extends StatefulWidget {
     required this.foods,
     required this.date,
     this.plannedMeal,
+    this.existingConsumption,
     this.suggestedItems = const [],
   });
   final OrvaRepository repository;
   final List<Map<String,Object?>> foods;
   final DateTime date;
   final Map<String,Object?>? plannedMeal;
+  final Map<String,Object?>? existingConsumption;
   final List<FoodQuantity> suggestedItems;
   @override
   State<_FoodConsumptionDialog> createState()=>_FoodConsumptionDialogState();
 }
 
 class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
-  late final TextEditingController _title=TextEditingController(text:widget.plannedMeal?['title'] as String? ?? '');
-  late final TextEditingController _note=TextEditingController();
+  late final TextEditingController _title=TextEditingController(
+    text: widget.existingConsumption?['title'] as String? ??
+        widget.plannedMeal?['title'] as String? ?? '',
+  );
+  late final TextEditingController _note=TextEditingController(
+    text: widget.existingConsumption?['note'] as String? ?? '',
+  );
   late final TextEditingController _quantity=TextEditingController(text:'100');
-  String _mealType='custom';
+  late String _mealType = widget.existingConsumption?['meal_type'] as String? ??
+      widget.plannedMeal?['meal_type'] as String? ?? 'custom';
   String _foodId='';
-  late DateTime _date=DateTime(widget.date.year,widget.date.month,widget.date.day);
+  late DateTime _date = DateTime.tryParse(
+    widget.existingConsumption?['consumed_date'] as String? ?? '',
+  ) ?? DateTime(widget.date.year,widget.date.month,widget.date.day);
   int? _minute;
   final List<FoodQuantity> _items=[];
   bool _saving=false;
@@ -719,11 +787,13 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
   @override
   void initState(){
     super.initState();
-    _mealType=widget.plannedMeal?['meal_type'] as String? ?? 'custom';
     _items.addAll(widget.suggestedItems);
     if(widget.foods.isNotEmpty){_foodId=widget.foods.first['id'] as String;_quantity.text='${widget.foods.first['reference_amount']}';}
     final now=DateTime.now();
-    _minute=DateUtils.isSameDay(_date,now)?now.hour*60+now.minute:null;
+    final storedMinute = widget.existingConsumption?['consumed_minute'];
+    _minute = storedMinute is num
+        ? storedMinute.toInt()
+        : DateUtils.isSameDay(_date,now) ? now.hour*60+now.minute : null;
   }
 
   @override
@@ -747,6 +817,7 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
     setState(()=>_saving=true);
     try{
       await widget.repository.saveFoodConsumption(
+        id: widget.existingConsumption?['id'] as String?,
         consumedDate:_date,
         consumedMinute:_minute,
         mealType:_mealType,
@@ -762,7 +833,7 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
 
   @override
   Widget build(BuildContext context)=>AlertDialog(
-    title:const Text('Registrar o que consumiu'),
+    title:Text(widget.existingConsumption == null ? 'Registrar o que consumiu' : 'Editar consumo'),
     content:SizedBox(
       width:480,
       child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -792,7 +863,7 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
           label:Text(_minute==null?'Adicionar horário':'Horário: ${formatClock(_minute!)}'),
         ),
         const Divider(height:20),
-        if (widget.suggestedItems.isNotEmpty) ...[
+        if (widget.suggestedItems.isNotEmpty && widget.existingConsumption == null) ...[
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
