@@ -10,9 +10,15 @@ void main() {
     test('new PINs use a versioned slow hash, not plain text', () {
       final salt = PinSecurity.generateSalt();
       final hash = PinSecurity.hash('1234', salt);
+      final separator = String.fromCharCode(36);
       expect(hash, isNot('1234'));
-      expect(hash.startsWith('pbkdf2-sha256\\u0024120000\\u0024'), isTrue);
-      expect(hash.substring(hash.lastIndexOf('\\u0024') + 1).length, 64);
+      expect(
+        hash.startsWith(
+          'pbkdf2-sha256' + separator + PinSecurity.iterations.toString() + separator,
+        ),
+        isTrue,
+      );
+      expect(hash.substring(hash.lastIndexOf(separator) + 1).length, 64);
       expect(PinSecurity.needsUpgrade(hash), isFalse);
     });
 
