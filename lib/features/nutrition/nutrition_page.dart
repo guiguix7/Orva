@@ -23,14 +23,15 @@ double? _parseNullableDouble(String value) {
 }
 
 class NutritionPage extends ConsumerStatefulWidget {
-  const NutritionPage({super.key});
+  const NutritionPage({super.key, this.initialDate});
+  final DateTime? initialDate;
   @override
   ConsumerState<NutritionPage> createState() => _NutritionPageState();
 }
 
 class _NutritionPageState extends ConsumerState<NutritionPage> {
   String _tab = 'today';
-  DateTime _date = DateTime.now();
+  late DateTime _date = widget.initialDate ?? DateTime.now();
   bool _loading = true;
   List<Map<String, Object?>> _foods = [];
   List<Map<String, Object?>> _todayPlans = [];
