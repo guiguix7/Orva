@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
@@ -6,6 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/database/orva_repository.dart';
+import '../../core/domain/orva_calculations.dart';
+import '../../core/database/obligations_repository.dart';
+import '../../core/database/nutrition_repository.dart';
+import '../obligations/obligations_page.dart';
+import '../nutrition/nutrition_page.dart';
+import '../studies/study_page.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 import '../checklists/checklists_page.dart';
@@ -27,6 +34,8 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   bool _loading = true;
+  DateTime _now = DateTime.now();
+  Timer? _clock;
   String? _userName;
   String? _focus;
   Map<String, Object?> _summary = {};
@@ -39,7 +48,16 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   void initState() {
     super.initState();
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _clock?.cancel();
+    super.dispose();
   }
 
   @override
@@ -65,16 +83,40 @@ class _HomePageState extends ConsumerState<HomePage> {
         repo.getTodayOccurrenceItems(now),
         repo.getRoutineForDate(now),
         repo.getWeeklyHobbyMinutes(date: now),
+        repo.getObligationTimeBlocksForDate(now),
+        repo.getMealPlanTimeBlocksForDate(now),
       ]);
       if (!mounted) return;
+      final routineBlocks = values[5] as List<Map<String, Object?>>;
+      final hobbyRows = values[6] as List<Map<String, Object?>>;
+      final obligationBlocks = values[7] as List<Map<String, Object?>>;
+      final mealPlanBlocks = values[8] as List<Map<String, Object?>>;
+      final allBlocks = <Map<String, Object?>>[
+        ...routineBlocks,
+        ...obligationBlocks,
+        ...mealPlanBlocks,
+      ]..sort((a, b) => intValue(a['start_minute']).compareTo(intValue(b['start_minute'])));
+      final intervals = allBlocks.map((block) => PlannedInterval(
+        intValue(block['start_minute']),
+        intValue(block['end_minute']),
+        (block['category'] as String?)?.trim().isNotEmpty == true
+            ? block['category'] as String
+            : 'Sem categoria',
+        block['title'] as String? ?? '',
+      )).toList();
+      final summary = Map<String, Object?>.from(values[2] as Map<String, Object?>)
+        ..['routineBlocks'] = allBlocks.length
+        ..['plannedMinutes'] = occupiedMinutes(intervals)
+        ..['unplannedMinutes'] = 1440 - occupiedMinutes(intervals)
+        ..['plannedCategories'] = categoryMinutes(intervals);
       setState(() {
         _userName = (values[0] as String?)?.trim();
         _focus = (values[1] as String?)?.trim();
-        _summary = values[2] as Map<String, Object?>;
+        _summary = summary;
         _goals = (values[3] as List<Map<String, Object?>>).take(3).toList();
         _items = (values[4] as List<Map<String, Object?>>).take(5).toList();
-        _routine = values[5] as List<Map<String, Object?>>;
-        _hobbies = (values[6] as List<Map<String, Object?>>).take(3).toList();
+        _routine = allBlocks;
+        _hobbies = hobbyRows.take(3).toList();
         _loading = false;
         _error = null;
       });
@@ -88,11 +130,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     final choice = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Criar algo novo', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 14),
             _QuickActionTile(icon: Icons.check_circle_outline, title: 'Tarefa de hoje', subtitle: 'Adicionar um item ao checklist do dia', onTap: () => Navigator.pop(context, 'task')),
@@ -101,7 +145,11 @@ class _HomePageState extends ConsumerState<HomePage> {
             _QuickActionTile(icon: Icons.menu_book_outlined, title: 'Entrada no diário', subtitle: 'Registrar algo sobre o seu dia', onTap: () => Navigator.pop(context, 'journal')),
             _QuickActionTile(icon: Icons.schedule_outlined, title: 'Bloco de rotina', subtitle: 'Planejar um período de tempo', onTap: () => Navigator.pop(context, 'routine')),
             _QuickActionTile(icon: Icons.sports_esports_outlined, title: 'Hobby', subtitle: 'Acompanhar tempo de uma atividade', onTap: () => Navigator.pop(context, 'hobby')),
-          ]),
+            _QuickActionTile(icon: Icons.school_outlined, title: 'Sessão de estudo', subtitle: 'Registrar tempo e assunto estudado', onTap: () => Navigator.pop(context, 'study')),
+            _QuickActionTile(icon: Icons.restaurant_outlined, title: 'Consumo alimentar', subtitle: 'Registrar o que realmente consumiu', onTap: () => Navigator.pop(context, 'nutrition')),
+            _QuickActionTile(icon: Icons.repeat_outlined, title: 'Obrigação recorrente', subtitle: 'Configurar uma necessidade que se repete', onTap: () => Navigator.pop(context, 'obligation')),
+            ]),
+          ),
         ),
       ),
     );
@@ -125,6 +173,15 @@ class _HomePageState extends ConsumerState<HomePage> {
           break;
         case 'hobby':
           await showHobbyEditor(context, ref);
+          break;
+        case 'study':
+          await _openPage(const StudyPage());
+          break;
+        case 'nutrition':
+          await _openPage(const NutritionPage());
+          break;
+        case 'obligation':
+          await _openPage(const ObligationsPage());
           break;
       }
       await _load();
@@ -160,18 +217,18 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final nameState = ref.watch(userNameProvider);
     final currentName = nameState.hasValue ? nameState.value : _userName;
-    final now = DateTime.now();
+    final now = _now;
     final date = DateFormat('EEEE, d MMMM', 'pt_BR').format(now);
-    final greeting = now.hour < 12 ? 'Bom dia' : now.hour < 18 ? 'Boa tarde' : 'Boa noite';
+    final greeting = greetingForHour(now.hour);
     final name = currentName == null || currentName.isEmpty ? '' : ', $currentName';
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton.small(
         onPressed: _quickAction,
+        tooltip: 'Criar algo novo',
         backgroundColor: OrvaColors.primary,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Criar'),
+        child: const Icon(Icons.add),
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -181,7 +238,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               : _error != null
                   ? ListView(children: [OrvaEmptyState(icon: Icons.error_outline, title: 'Não foi possível carregar', message: _error!, actionLabel: 'Tentar novamente', onAction: _load)])
                   : ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 100),
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
                       children: [
                         Row(children: [
                           Container(width: 42, height: 42, decoration: BoxDecoration(color: OrvaColors.primary, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.spa_outlined, color: Colors.white, size: 24)),
@@ -195,7 +252,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         const SizedBox(height: 6),
                         Text(_capitalize(date), style: Theme.of(context).textTheme.bodyMedium),
                         const SizedBox(height: 28),
-                        _FocusCard(focus: _focus, onEditFocus: _editFocus, onAddTask: () async { await showAddTodayTaskDialog(context, ref); await _load(); }, onOpenChecklists: () => widget.onNavigate(1)),
+                        _FocusCard(focus: _focus, onEditFocus: _editFocus),
                         const SizedBox(height: 26),
                         OrvaSectionHeader(title: 'Seu dia, em números'),
                         const SizedBox(height: 12),
@@ -270,36 +327,66 @@ class _HomePageState extends ConsumerState<HomePage> {
 String _capitalize(String value) => value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
 
 class _FocusCard extends StatelessWidget {
-  const _FocusCard({required this.focus, required this.onEditFocus, required this.onAddTask, required this.onOpenChecklists});
+  const _FocusCard({required this.focus, required this.onEditFocus});
   final String? focus;
   final VoidCallback onEditFocus;
-  final VoidCallback onAddTask;
-  final VoidCallback onOpenChecklists;
 
   @override
   Widget build(BuildContext context) {
+    final hasFocus = focus?.trim().isNotEmpty == true;
     return OrvaSurface(
-      color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF24332F) : OrvaColors.primary900,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF24332F)
+          : OrvaColors.primary900,
       padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.spa_outlined, color: Color(0xFFB9D6D0), size: 20),
-          const SizedBox(width: 8),
-          Text('FOCO DO DIA', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: const Color(0xFFB9D6D0), letterSpacing: 1.2, fontSize: 11)),
-          const Spacer(),
-          IconButton(onPressed: onEditFocus, tooltip: 'Editar foco', icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFFD7E4E1))),
-        ]),
-        const SizedBox(height: 8),
-        Text(focus?.isNotEmpty == true ? focus! : 'Escolha sua prioridade para hoje.', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontSize: 23)),
-        const SizedBox(height: 7),
-        Text(focus?.isNotEmpty == true ? 'Mantenha essa prioridade visível enquanto organiza o restante do dia.' : 'Este campo é opcional e só aparece depois que você definir um foco.', style: const TextStyle(color: Color(0xFFD7E4E1), height: 1.45)),
-        const SizedBox(height: 18),
-        Row(children: [
-          Expanded(child: FilledButton(onPressed: onAddTask, style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE6F0ED), foregroundColor: OrvaColors.primary900, minimumSize: const Size(0, 46)), child: const Text('Adicionar tarefa'))),
-          const SizedBox(width: 10),
-          IconButton.filledTonal(onPressed: onOpenChecklists, tooltip: 'Abrir checklists', style: IconButton.styleFrom(backgroundColor: const Color(0xFF36534D), foregroundColor: Colors.white, minimumSize: const Size(46, 46)), icon: const Icon(Icons.arrow_forward_rounded)),
-        ]),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.spa_outlined, color: Color(0xFFB9D6D0), size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'FOCO DO DIA',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: const Color(0xFFB9D6D0),
+                    letterSpacing: 1.2,
+                    fontSize: 11,
+                  ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Text(
+            hasFocus
+                ? focus!.trim()
+                : 'Qual é a principal coisa que você quer realizar hoje?',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontSize: 22,
+                ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            hasFocus
+                ? 'Seu foco principal para hoje. Você pode ajustá-lo a qualquer momento.'
+                : 'Escolha uma prioridade que faça sentido para você. O foco é opcional.',
+            style: const TextStyle(color: Color(0xFFD7E4E1), height: 1.45),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onEditFocus,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE6F0ED),
+                foregroundColor: OrvaColors.primary900,
+                minimumSize: const Size(0, 46),
+              ),
+              icon: Icon(hasFocus ? Icons.edit_outlined : Icons.flag_outlined),
+              label: Text(hasFocus ? 'Editar foco' : 'Definir foco'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -437,54 +524,157 @@ class _DayAllocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (routine.isEmpty) {
-      return const OrvaSurface(child: OrvaEmptyState(icon: Icons.donut_large_outlined, title: 'Ainda não há horários planejados', message: 'Adicione blocos à rotina para visualizar a ocupação e as horas não definidas.', compact: true));
+      return const OrvaSurface(
+        child: OrvaEmptyState(
+          icon: Icons.donut_large_outlined,
+          title: 'Ainda não há horários planejados',
+          message: 'Adicione blocos à rotina para visualizar a ocupação e as horas não definidas.',
+          compact: true,
+        ),
+      );
     }
-    final occupied = intValue(summary['plannedMinutes']);
+
+    final occupied = intValue(summary['plannedMinutes']).clamp(0, 1440).toInt();
     final free = 1440 - occupied;
     final raw = summary['plannedCategories'];
     final categories = raw is Map<String, int> ? raw : <String, int>{};
     final scheme = Theme.of(context).colorScheme;
-    final colors = [OrvaColors.primary, OrvaColors.information, OrvaColors.terracotta,
-      OrvaColors.mustard, OrvaColors.success, const Color(0xFF8B6B9E)];
-    return OrvaSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Ocupação das 24 horas', style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 6),
-      Text('Planejamento · horários sobrepostos contados uma única vez.', style: Theme.of(context).textTheme.bodySmall),
-      const SizedBox(height: 18),
-      Center(child: SizedBox(width: 154, height: 154, child: Stack(alignment: Alignment.center, children: [
-        SizedBox.expand(child: CustomPaint(painter: _DailyRingPainter(
-          minutes: categories.values.toList(), colors: colors,
-          freeMinutes: free, emptyColor: scheme.surfaceContainerHighest,
-        ))),
-        Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('${(occupied / 1440 * 100).round()}%', style: Theme.of(context).textTheme.headlineMedium),
-          Text('${formatMinutes(occupied)} planejadas', style: Theme.of(context).textTheme.bodySmall),
-        ]),
-      ]))),
-      const SizedBox(height: 18),
-      ...categories.entries.toList().asMap().entries.map((entry) {
-        final category = entry.value;
-        final related = routine.where((block) =>
-          ((block['category'] as String?)?.trim().isNotEmpty == true ? block['category'] : 'Sem categoria') == category.key).toList();
-        return ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          leading: CircleAvatar(radius: 6, backgroundColor: colors[entry.key % colors.length]),
-          title: Text(category.key, style: Theme.of(context).textTheme.bodyLarge),
-          trailing: Text(formatMinutes(category.value), style: Theme.of(context).textTheme.titleMedium),
-          children: related.map((block) => ListTile(
-            dense: true, title: Text('${block['title']}'),
-            subtitle: Text('${_homeClock(intValue(block['start_minute']))}–${_homeClock(intValue(block['end_minute']))} · horário planejado'),
-          )).toList(),
-        );
-      }),
-      const Divider(height: 20),
-      Row(children: [
-        Expanded(child: Text('Tempo não definido', style: Theme.of(context).textTheme.bodyLarge)),
-        Text(formatMinutes(free), style: Theme.of(context).textTheme.titleMedium),
-      ]),
-      const SizedBox(height: 5),
-      Text('Horas livres não são interpretadas como improdutividade.', style: Theme.of(context).textTheme.bodySmall),
-    ]));
+    final colors = [
+      OrvaColors.primary,
+      OrvaColors.information,
+      OrvaColors.terracotta,
+      OrvaColors.mustard,
+      OrvaColors.success,
+      const Color(0xFF8B6B9E),
+    ];
+
+    final ring = SizedBox(
+      width: 154,
+      height: 154,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: CustomPaint(
+              painter: _DailyRingPainter(
+                minutes: categories.values.toList(),
+                colors: colors,
+                freeMinutes: free,
+                emptyColor: scheme.surfaceContainerHighest,
+              ),
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${(occupied / 1440 * 100).round()}%',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              Text(
+                '${formatMinutes(occupied)} planejadas',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final categoryTiles = categories.entries.toList().asMap().entries.map((entry) {
+      final category = entry.value;
+      final related = routine.where((block) =>
+        ((block['category'] as String?)?.trim().isNotEmpty == true
+            ? block['category']
+            : 'Sem categoria') == category.key).toList();
+
+      return ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        leading: CircleAvatar(
+          radius: 6,
+          backgroundColor: colors[entry.key % colors.length],
+        ),
+        title: Text(
+          category.key,
+          style: Theme.of(context).textTheme.bodyLarge,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Text(
+          formatMinutes(category.value),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        children: related.map((block) => ListTile(
+          dense: true,
+          title: Text('${block['title']}'),
+          subtitle: Text(
+            '${_homeClock(intValue(block['start_minute']))}–${_homeClock(intValue(block['end_minute']))} · horário planejado',
+          ),
+        )).toList(),
+      );
+    }).toList();
+
+    return OrvaSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ocupação das 24 horas',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Planejamento · horários sobrepostos contados uma única vez.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth >= 500) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ring,
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: categoryTiles,
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Column(
+                children: [
+                  Center(child: ring),
+                  const SizedBox(height: 8),
+                  ...categoryTiles,
+                ],
+              );
+            },
+          ),
+          const Divider(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Tempo não definido',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
+              Text(formatMinutes(free), style: Theme.of(context).textTheme.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Horas livres não são interpretadas como improdutividade.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
   }
 }
 

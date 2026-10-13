@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_database.dart';
 import '../domain/orva_calculations.dart';
+import '../logging/orva_diagnostics.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final database = AppDatabase();
@@ -36,11 +37,33 @@ final class OrvaRepository {
     String sql, [
     List<Variable<Object>> variables = const [],
   ]) async {
-    final result = await db.customSelect(sql, variables: variables).get();
-    return result.map((row) => Map<String, Object?>.from(row.data)).toList();
+    try {
+      final result = await db.customSelect(sql, variables: variables).get();
+      return result.map((row) => Map<String, Object?>.from(row.data)).toList();
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'query',
+        module: 'database',
+      );
+      rethrow;
+    }
   }
 
-  Future<void> execute(String sql, [List<Object?> args = const []]) => db.customStatement(sql, args);
+  Future<void> execute(String sql, [List<Object?> args = const []]) async {
+    try {
+      await db.customStatement(sql, args);
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'statement',
+        module: 'database',
+      );
+      rethrow;
+    }
+  }
 
   Future<String?> getSetting(String key) async {
     final result = await rows('SELECT setting_value FROM settings WHERE setting_key = ?', [Variable.withString(key)]);
@@ -680,16 +703,30 @@ final class OrvaRepository {
   Future<void> setBiometricEnabled(bool enabled) => setSetting('security_biometric_enabled', enabled ? '1' : '0');
 
   Future<void> setPin({required String pinHash, required String pinSalt}) async {
-    await setSetting('security_pin_hash', pinHash);
-    await setSetting('security_pin_salt', pinSalt);
-    await setSetting('security_lock_enabled', '1');
+    // PIN hash, salt and enabled state must change atomically. A partially
+    // written setting must never leave the app believing a PIN is configured.
+    await db.transaction(() async {
+      await _writeSettingsAtomically({
+        'security_pin_hash': pinHash,
+        'security_pin_salt': pinSalt,
+        'security_lock_enabled': '1',
+        'security_pin_failed_attempts': '0',
+        'security_pin_lockout_until': '0',
+      });
+    });
   }
 
   Future<void> disableLock() async {
-    await setSetting('security_lock_enabled', '0');
-    await setSetting('security_pin_hash', '');
-    await setSetting('security_pin_salt', '');
-    await setSetting('security_biometric_enabled', '0');
+    await db.transaction(() async {
+      await _writeSettingsAtomically({
+        'security_lock_enabled': '0',
+        'security_pin_hash': '',
+        'security_pin_salt': '',
+        'security_biometric_enabled': '0',
+        'security_pin_failed_attempts': '0',
+        'security_pin_lockout_until': '0',
+      });
+    });
   }
 
   Future<({String hash, String salt})?> getPinHashAndSalt() async {
@@ -699,9 +736,73 @@ final class OrvaRepository {
     return (hash: hash, salt: salt);
   }
 
+  Future<void> _writeSettingsAtomically(Map<String, String> values) async {
+    final now = timestamp();
+    for (final entry in values.entries) {
+      await execute(
+        '''INSERT INTO settings(setting_key, setting_value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+          setting_value=excluded.setting_value, updated_at=excluded.updated_at''',
+        [entry.key, entry.value, now],
+      );
+    }
+  }
+
+  Future<int> getPinFailedAttempts() async =>
+      int.tryParse(await getSetting('security_pin_failed_attempts') ?? '') ?? 0;
+
+  Future<DateTime?> getPinLockoutUntil() async {
+    final milliseconds =
+        int.tryParse(await getSetting('security_pin_lockout_until') ?? '') ?? 0;
+    if (milliseconds <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+  }
+
+  /// Records a wrong PIN and applies an exponential pause from the fifth
+  /// failure onward. Values persist locally so restarting the app cannot
+  /// immediately reset the retry counter.
+  Future<DateTime?> recordPinFailure() async {
+    DateTime? lockoutUntil;
+    await db.transaction(() async {
+      final attempts = (int.tryParse(
+                await getSetting('security_pin_failed_attempts') ?? '',
+              ) ??
+              0) +
+          1;
+      final values = <String, String>{
+        'security_pin_failed_attempts': attempts.toString(),
+      };
+      if (attempts >= 5) {
+        final exponent = (attempts - 5).clamp(0, 5).toInt();
+        final seconds = (30 * (1 << exponent)).clamp(30, 900).toInt();
+        lockoutUntil = DateTime.now().add(Duration(seconds: seconds));
+        values['security_pin_lockout_until'] =
+            lockoutUntil!.millisecondsSinceEpoch.toString();
+      }
+      await _writeSettingsAtomically(values);
+    });
+    return lockoutUntil;
+  }
+
+  Future<void> resetPinFailures() async {
+    await db.transaction(() async {
+      await _writeSettingsAtomically({
+        'security_pin_failed_attempts': '0',
+        'security_pin_lockout_until': '0',
+      });
+    });
+  }
+
   // Backup format is explicit and versioned. Import callers must confirm data
   // replacement with the user before calling importBackup.
-  static const backupVersion = 3;
+  static const backupVersion = 4;
+  static const _legacyBackupTablesV3 = <String>{
+    'categories','goals','goal_progress_history','checklists','checklist_items',
+    'checklist_occurrences','checklist_occurrence_items','routine_blocks','hobbies',
+    'routine_templates','routine_template_blocks','hobby_sessions','notes',
+    'journal_entries','weight_entries','settings',
+  };
   static const _backupTables = <String>[
     'categories',
     'goals',
@@ -718,6 +819,18 @@ final class OrvaRepository {
     'notes',
     'journal_entries',
     'weight_entries',
+    'study_subjects',
+    'study_topics',
+    'study_sessions',
+    'study_reviews',
+    'foods',
+    'meal_plans',
+    'meal_plan_items',
+    'food_consumptions',
+    'food_consumption_items',
+    'obligation_rules',
+    'obligation_exceptions',
+    'obligation_occurrences',
     'settings',
   ];
 
@@ -729,6 +842,8 @@ final class OrvaRepository {
     'security_pin_salt',
     'security_lock_enabled',
     'security_biometric_enabled',
+    'security_pin_failed_attempts',
+    'security_pin_lockout_until',
   };
 
   Future<Map<String, Object?>> exportBackup() async {
@@ -752,6 +867,29 @@ final class OrvaRepository {
   Future<void> importBackup(Object? decoded) async {
     if (decoded is! Map<String, dynamic> || decoded['format'] != 'orva_backup') {
       throw const FormatException('Este arquivo não é um backup válido do Orva.');
+    }
+    // v3 backups are upgraded in memory, adding empty collections for the
+    // newly introduced modules. Existing records are kept unchanged.
+    if (decoded['version'] == 3) {
+      final oldData = decoded['data'];
+      if (oldData is! Map<String, dynamic> ||
+          oldData.keys.toSet().length != _legacyBackupTablesV3.length ||
+          !oldData.keys.toSet().containsAll(_legacyBackupTablesV3)) {
+        throw const FormatException('A estrutura do backup v3 é incompatível.');
+      }
+      final upgradedData = Map<String, dynamic>.from(oldData);
+      for (final table in const [
+        'study_subjects','study_topics','study_sessions','study_reviews',
+        'foods','meal_plans','meal_plan_items','food_consumptions','food_consumption_items',
+        'obligation_rules','obligation_exceptions','obligation_occurrences',
+      ]) {
+        upgradedData[table] = <dynamic>[];
+      }
+      decoded = <String, dynamic>{
+        ...decoded,
+        'version': backupVersion,
+        'data': upgradedData,
+      };
     }
     if (decoded['version'] != backupVersion) {
       throw FormatException('Versão de backup não suportada: ${decoded['version']}.');
@@ -779,6 +917,18 @@ final class OrvaRepository {
       'notes': {'id','title','content','tags_json','created_at','updated_at'},
       'journal_entries': {'id','entry_date','content','mood','tags_json','created_at','updated_at'},
       'weight_entries': {'id','measured_at','weight_kg','note','created_at'},
+      'study_subjects': {'id','name','description','color_value','goal_id','is_active','created_at','updated_at'},
+      'study_topics': {'id','subject_id','parent_topic_id','name','description','status','order_index','created_at','updated_at'},
+      'study_sessions': {'id','subject_id','topic_id','goal_id','session_date','start_minute','duration_minutes','note','created_at','updated_at'},
+      'study_reviews': {'id','subject_id','topic_id','reviewed_at','review_kind','confidence','note','created_at'},
+      'foods': {'id','name','brand','reference_amount','reference_unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','nutrition_source','note','created_at','updated_at'},
+      'meal_plans': {'id','title','meal_type','recurrence','planned_date','weekdays_json','start_date','end_date','planned_minute','duration_minutes','note','is_active','created_at','updated_at'},
+      'meal_plan_items': {'id','meal_plan_id','food_id','food_name_snapshot','quantity','unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','order_index'},
+      'food_consumptions': {'id','consumed_date','consumed_minute','meal_type','title','note','created_at','updated_at'},
+      'food_consumption_items': {'id','consumption_id','food_id','food_name_snapshot','quantity','unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','order_index'},
+      'obligation_rules': {'id','name','category','start_minute','end_minute','recurrence','weekdays_json','start_date','end_date','priority','is_active','created_at','updated_at'},
+      'obligation_exceptions': {'id','rule_id','occurrence_date','action','override_name','override_category','override_start_minute','override_end_minute','note','created_at','updated_at'},
+      'obligation_occurrences': {'id','rule_id','occurrence_date','name_snapshot','category_snapshot','start_minute','end_minute','ends_next_day','status','note_snapshot','created_at','updated_at'},
       'settings': {'setting_key','setting_value','updated_at'},
     };
 
@@ -805,8 +955,12 @@ final class OrvaRepository {
     await db.transaction(() async {
       await execute('PRAGMA defer_foreign_keys = ON');
       for (final table in [
+        'food_consumption_items','food_consumptions','meal_plan_items','meal_plans','foods',
+        'obligation_occurrences','obligation_exceptions','obligation_rules',
+        'study_reviews','study_sessions','study_topics','study_subjects',
         'checklist_occurrence_items','checklist_occurrences','checklist_items','checklists',
-        'goal_progress_history','routine_blocks','routine_template_blocks','routine_templates','hobby_sessions','hobbies','journal_entries','weight_entries','notes','goals','categories',
+        'goal_progress_history','routine_blocks','routine_template_blocks','routine_templates',
+        'hobby_sessions','hobbies','journal_entries','weight_entries','notes','goals','categories',
       ]) {
         await execute('DELETE FROM $table');
       }

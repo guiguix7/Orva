@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../core/database/orva_repository.dart';
+import '../../core/logging/orva_diagnostics.dart';
 import '../../core/security/pin_security.dart';
+import '../../core/security/biometric_support.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 
@@ -36,23 +38,35 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
   }
 
   Future<void> _load() async {
-    final repo = ref.read(repositoryProvider);
-    final lockEnabled = await repo.isLockEnabled();
-    final biometricEnabled = await repo.isBiometricEnabled();
-    bool biometricAvailable = false;
     try {
+      final repo = ref.read(repositoryProvider);
+      final lockEnabled = await repo.isLockEnabled();
+      final biometricEnabled = await repo.isBiometricEnabled();
       final auth = LocalAuthentication();
-      biometricAvailable = await auth.canCheckBiometrics && await auth.isDeviceSupported();
-    } catch (_) {
-      biometricAvailable = false;
+      final biometricAvailable =
+          await OrvaBiometricSupport.canAuthenticate(auth);
+
+      if (!mounted) return;
+      setState(() {
+        _lockEnabled = lockEnabled;
+        _biometricEnabled = biometricEnabled;
+        _biometricAvailable = biometricAvailable;
+        _loading = false;
+      });
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'security-settings-load',
+        module: 'security',
+      );
+      if (!mounted) return;
+      setState(() => _loading = false);
+      showOrvaMessage(
+        context,
+        'Não foi possível carregar as configurações de bloqueio. Tente novamente.',
+      );
     }
-    if (!mounted) return;
-    setState(() {
-      _lockEnabled = lockEnabled;
-      _biometricEnabled = biometricEnabled;
-      _biometricAvailable = biometricAvailable;
-      _loading = false;
-    });
   }
 
   Future<void> _setupPin() async {
@@ -142,10 +156,10 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
   Future<String?> _askPin({required String title, required bool confirm}) async {
     final controller = TextEditingController();
     final confirmController = TextEditingController();
+    String? error;
     final result = await showDialog<String>(
       context: context,
       builder: (context) => StatefulBuilder(builder: (context, setDialogState) {
-        String? error;
         return AlertDialog(
           title: Text(title),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -192,6 +206,8 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
         );
       }),
     );
+    controller.dispose();
+    confirmController.dispose();
     return result;
   }
 

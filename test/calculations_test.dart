@@ -22,6 +22,17 @@ void main() {
     expect(occupiedMinutes(const []), 0);
   });
 
+  test('greeting uses morning, afternoon, and night boundaries correctly', () {
+    expect(greetingForHour(0), 'Boa noite');
+    expect(greetingForHour(4), 'Boa noite');
+    expect(greetingForHour(5), 'Bom dia');
+    expect(greetingForHour(11), 'Bom dia');
+    expect(greetingForHour(12), 'Boa tarde');
+    expect(greetingForHour(17), 'Boa tarde');
+    expect(greetingForHour(18), 'Boa noite');
+    expect(greetingForHour(23), 'Boa noite');
+  });
+
   test('theme changes based on local time', () {
     expect(isNightTheme(DateTime(2026, 10, 12, 6, 59)), true);
     expect(isNightTheme(DateTime(2026, 10, 12, 7)), false);

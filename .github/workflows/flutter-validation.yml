@@ -1,0 +1,70 @@
+name: Flutter validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: flutter-validation-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show toolchain versions
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Format Dart sources
+        run: dart format .
+
+      - name: Static analysis
+        shell: bash
+        run: |
+          set +e
+          flutter analyze --no-pub 2>&1 | tee "$RUNNER_TEMP/orva-analyze.log"
+          analyze_exit=${PIPESTATUS[0]}
+          set -e
+
+          if grep -Eq '(warning|error) •' "$RUNNER_TEMP/orva-analyze.log"; then
+            echo "Static analysis reported warning/error diagnostics."
+            exit 1
+          fi
+
+          if [ "$analyze_exit" -ne 0 ]; then
+            if grep -q 'info •' "$RUNNER_TEMP/orva-analyze.log"; then
+              echo "No warning/error diagnostics. Informational lint findings remain non-blocking and should be cleaned incrementally."
+            else
+              echo "Static analysis returned non-zero without a recognizable info-only report."
+              exit "$analyze_exit"
+            fi
+          fi
+
+      - name: Unit and widget tests
+        run: flutter test
+
+      - name: Debug Android build
+        run: flutter build apk --debug

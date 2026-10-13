@@ -180,3 +180,95 @@ flutter analyze
 flutter test
 flutter run
 ```
+
+
+## Estabilização de segurança e navegação — 13/10/2026
+
+Esta revisão incremental aplica correções sobre a base existente, sem recriar o app nem alterar o namespace Android ou o schema SQLite:
+
+- **Biometria Android:** a Activity usa `FlutterFragmentActivity` e o manifesto declara `USE_BIOMETRIC`. A configuração considera suporte do aparelho e biometria efetivamente cadastrada, não apenas a presença de hardware.
+- **PIN local:** novos PINs usam PBKDF2-HMAC-SHA256 com salt aleatório e hash versionado. Hashes antigos em SHA-256 salgado continuam verificáveis e são atualizados após a validação bem-sucedida. Isso não criptografa o banco SQLite.
+- **Tentativas de PIN:** a contagem é persistida localmente; após cinco falhas há uma pausa de 30 segundos, com aumento progressivo até 15 minutos. Um PIN correto limpa o contador; desativar o bloqueio limpa a configuração de segurança.
+- **Tela de bloqueio:** usa a cor de fundo do tema atual para manter contraste no modo claro e escuro. Falhas da biometria mantêm o PIN como alternativa.
+- **Voltar no Android:** em uma aba principal diferente de Hoje, a primeira ação de voltar retorna à Home; na raiz da Home o comportamento padrão do Android é preservado.
+- **Home:** saudação corrigida para usar “Boa noite” entre 18:00 e 04:59 e atualizada enquanto a tela permanece aberta. O cartão “Foco do dia” agora tem uma única ação principal e o botão de criação rápida é compacto para reduzir sobreposição de conteúdo.
+- **Testes adicionados:** limites da saudação, compatibilidade dos hashes antigos, geração/verificação PBKDF2, persistência de tentativas e limpeza do bloqueio.
+
+**Validação pendente:** os testes Flutter, a análise estática e o build Android precisam ser executados em um ambiente com Flutter/Dart e Android SDK. A biometria, o retorno do background e o gesto físico de voltar também exigem validação em emulador/dispositivo; não devem ser considerados comprovados apenas por estas alterações de código.
+
+
+- **Console de diagnóstico:** nova tela disponível em Mais somente em builds de desenvolvimento; captura erros Flutter/Dart, falhas de banco e de desbloqueio local, com filtros, busca, limite de 500 eventos em memória, limpeza e exportação. Mensagens de exceção arbitrárias não são exportadas; tokens, PINs e e-mails têm redatores adicionais.
+- **Ocupação do tempo:** gráfico e lista de categorias são apresentados lado a lado em áreas largas e empilhados em telas estreitas, mantendo os horários sobrepostos contados uma única vez.
+- **Testes adicionais:** sanitização de tokens/e-mails, omissão de detalhes privados de exceções e limite de histórico do console. Os testes foram escritos, mas não executados neste ambiente sem Flutter/Dart.
+
+
+## Matriz de requisitos do Prompt Master — estado honesto desta revisão
+
+Os estados abaixo distinguem o que já existe no código do que esta revisão tocou. “Implementado, aguardando validação” significa que há código no branch, mas ainda faltam execução de testes/build e, quando aplicável, verificação num Android real. Nenhum item é marcado como “Concluído e validado” nesta revisão porque esses comandos não puderam ser executados.
+
+| Área/requisito | Estado nesta revisão | Escopo real / pendência principal |
+|---|---|---|
+| Auditoria da base, preservação do projeto e namespace Android | Parcialmente implementado | A revisão foi feita sobre o repositório existente; namespace mantido e nenhuma migration destrutiva adicionada. A inspeção local do ZIP e a execução da toolchain não ficaram disponíveis. |
+| PIN local e bloqueio | Implementado, aguardando validação | PBKDF2-HMAC-SHA256 versionado, migração transparente de hashes antigos, limite de tentativas persistente, limpeza atômica e fallback por PIN. Testar recuperação e concorrência em dispositivo. |
+| Biometria Android real | Implementado, aguardando validação | Activity compatível com FragmentActivity, permissão, tema de inicialização e distinção por versão Android; ainda requer teste com biometria cadastrada, cancelamento e background. |
+| Console interno de diagnóstico | Implementado, aguardando validação | Eventos Flutter/Dart, falhas de banco e bloqueio local, filtros, pesquisa, histórico limitado em memória e exportação com sanitização; teste de ponta a ponta pendente. |
+| Voltar em abas secundárias | Implementado, aguardando validação | Volta à Home antes de permitir sair da raiz; validar botão, gesto e formulários/modal em dispositivo. |
+| Contraste da tela bloqueada | Implementado, aguardando validação | Fundo deriva do tema ativo; falta validação visual/contraste WCAG e leitor de tela. |
+| FAB, foco do dia e saudação | Implementado, aguardando validação | FAB compacto, ação primária única para definir/editar foco e saudação por horário corrigida/atualizada; falta teste visual em múltiplos tamanhos. |
+| Cartão de ocupação | Implementado, aguardando validação | Layout responsivo para gráfico/legenda e sobreposições já calculadas sem duplicar a duração total. A regra segue baseada em blocos planejados existentes, não execução. |
+| Home e integração contextual | Parcialmente implementado | Resumo local existente de checklists, metas, rotina e hobbies. Personalização/reordenação de seções e todos os indicadores do prompt não foram concluídos. |
+| Metas | Parcialmente implementado | CRUD local, progresso manual, prazos sugeridos, metas superiores e histórico existentes. Progresso automático por sessões, agregação ponderada e fluxos semanais/mensais completos continuam pendentes. |
+| Checklists e hábitos | Parcialmente implementado | Ocorrências recorrentes e snapshots históricos existentes. Hábitos como módulo próprio, todas as regras de recorrência e estatísticas completas continuam pendentes. |
+| Rotina e calendário | Parcialmente implementado | Blocos locais, templates semanais, duplicação e conflito/ocupação básicos existentes. Grade interativa dia/semana/mês, eventos cruzando meia-noite, exceções de série e arrastar/redimensionar não estão concluídos. |
+| Obrigações e necessidades recorrentes | Implementado, aguardando validação | Regras locais de recorrência, snapshots de ocorrência, exceções por data (pular/alterar/remover), divisão de intervalos noturnos e integração na linha do tempo/ocupação. Falta validar em runtime, expandir regras avançadas e testar timezone/DST. |
+| Hobbies | Parcialmente implementado | Cadastro, sessões realizadas e metas semanais básicas existentes. Integração automática completa com metas e estatísticas históricas precisa ser construída. |
+| Estudos | Implementado, aguardando validação | Matérias, hierarquia de assuntos/subtópicos, estado, sessões reais, revisões, vínculo opcional com meta, resumo semanal e criação de blocos de estudo planejados na rotina. Ainda falta progressão automática de metas e testes de interface/integração. |
+| Alimentação/dieta | Implementado, aguardando validação | Catálogo de alimentos com fonte manual de nutrientes, planos recorrentes e pontuais, duração/horário opcional, itens com snapshots, registro/edição separado do consumo real e resumo diário de valores conhecidos/parciais. Ainda não há tabela nutricional online nem prescrição/recomendação dietética. |
+| Peso e IMC | Parcialmente implementado | Há registros locais de peso e uma função de cálculo de IMC. A camada de experiência/limitações por faixa etária e os gráficos precisam de validação/expansão. |
+| Estatísticas históricas | Parcialmente implementado | A Home oferece resumos locais; painéis semanais/mensais, comparação planejado-realizado e gráficos completos ainda não existem. |
+| Google Sign-In/Firebase Auth e onboarding | Bloqueado por configuração externa | O projeto contém dependências/configuração Firebase, mas o fluxo funcional de conta, onboarding e segregação de contas ainda não está implementado. São necessárias credenciais/configuração do proprietário e testes reais. |
+| Google Calendar | Bloqueado por configuração externa | Consentimento OAuth, leitura/escrita, cache e prevenção de duplicações não implementados. Depende de configuração do Google Cloud e testes de autorização/quotas. |
+| Notificações locais | Não iniciado | Agendamento, permissões por versão do Android e atualização/cancelamento de lembretes pendentes. |
+| Notas e diário | Parcialmente implementado | CRUD local, pesquisa e tags básicas existentes. Criptografia do banco/diário não implementada; SQLite local não deve ser considerado criptografado. |
+| Frases filosóficas | Parcialmente implementado | Biblioteca offline, seleção diária e opção para desativar existentes. Rever atribuição/licenciamento na futura expansão. |
+| Temas e personalização | Parcialmente implementado | Claro/escuro/sistema e automático por horário existentes. Horários configuráveis, preferências completas e personalização geral da Home ainda pendentes. |
+| Backup e restauração | Parcialmente implementado | JSON versionado com validação, confirmação e transação já existente. Proteger backups com criptografia e cobrir futuros módulos quando implementados. |
+| Segurança dos dados em repouso | Parcialmente implementado | PIN é derivado/armazenado como hash, mas isso não cifra as tabelas SQLite. Criptografia do diário/banco não implementada. |
+| Testes, analyze e build | Implementado, aguardando validação | Testes adicionais foram escritos para cálculos, hashes, limite de tentativas e sanitização. `flutter pub get`, `dart format`, `flutter analyze`, `flutter test` e build APK não foram executados neste ambiente. |
+
+Esta branch é uma **entrega parcial de estabilização (principalmente Fase 1)**, e não a conclusão integral das 35 partes do Prompt Master. As pendências da tabela continuam abertas e devem permanecer visíveis nos próximos ciclos de desenvolvimento.
+
+
+## Entrega incremental — Estudos, Alimentação e Obrigações
+
+Esta revisão acrescenta migração de schema 3 para 4 e telas reais para três áreas. Os registros são locais; nenhuma conta, API paga ou conjunto de dados fictícios foi introduzido.
+
+### Estudos
+- Cadastre e arquive matérias; opcionalmente vincule cada matéria a uma meta existente.
+- Organize assuntos e subtópicos hierárquicos, avance o estado de aprendizado e preserve assuntos que tenham histórico.
+- Registre uma sessão realizada com data, início, duração, observações e meta relacionada.
+- Registre revisões/testes/resumos com confiança de 1 a 5 e observações futuras.
+- Use **Planejar** para inserir um bloco datado na Rotina. O bloco planejado não cria uma sessão realizada nem incrementa automaticamente a meta.
+
+### Alimentação e saúde
+- Cadastre alimentos e informe apenas os valores nutricionais conhecidos; a origem dos valores fica visível. Não há busca em tabela externa e nenhum valor ausente é inferido.
+- Planeje refeições pontuais/recorrentes. A refeição só entra na ocupação do tempo se houver horário e duração explícitos.
+- Registre o que foi realmente consumido em separado do planejamento. Ao abrir um plano para registrar o consumo, os itens planejados aparecem como sugestões editáveis — o usuário confirma antes de salvar.
+- Corrija um registro de consumo preservando os snapshots nutricionais, mesmo se o alimento do catálogo foi alterado ou removido.
+- O resumo diário diferencia valores conhecidos de um total parcial; não deve ser interpretado como recomendação clínica ou nutricional.
+
+### Obrigações recorrentes
+- Cadastre uma regra única, diária ou semanal, com intervalo de início/fim, prioridade e período de vigência.
+- Um fim anterior ao início representa um intervalo que atravessa a meia-noite. O evento continua vinculado ao dia em que começou e é dividido em dois blocos apenas para mostrar a ocupação diária.
+- Para uma data específica, dispense a ocorrência, altere nome/categoria/horário só naquele dia ou remova a exceção.
+- A lista de histórico usa snapshots; editar a regra não reescreve ocorrências já concluídas.
+- Obrigações e refeições com duração explícita são mostradas junto da Rotina diária e entram no cálculo por união dos intervalos. Sobreposições são sinalizadas e não são somadas duas vezes no total líquido.
+- As sugestões “Sono”, “Escola” e “Refeição” apenas abrem um formulário; nada é ativado sem ação do usuário.
+
+### Banco e backup
+- Schema 4 é aditivo: as tabelas anteriores são mantidas e uma migration cria apenas as tabelas dos novos módulos.
+- Backup agora usa versão 4, inclui as tabelas novas e exclui dados de autenticação local.
+- Importação de backup versão 3 cria coleções vazias para os módulos novos e preserva os dados que já existiam no arquivo antigo.
+
+### Testes adicionados
+Os testes de repositório cobrem hierarquia/sessões/revisões de estudo, separação entre planejamento e consumo com snapshots nutricionais, projeção de intervalos noturnos/exceções e migração de backup v3. Os testes foram escritos, mas ainda não executados porque a toolchain Flutter/Dart não está disponível neste ambiente.
