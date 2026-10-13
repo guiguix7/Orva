@@ -256,7 +256,12 @@ extension StudyRepository on OrvaRepository {
         COUNT(DISTINCT session_date) AS study_days
       FROM study_sessions $where
     ''',vars);
-    final reviews=await rows('SELECT COUNT(*) AS count FROM study_reviews',[]);
+    final reviewClauses=<String>[];
+    final reviewVars=<Variable<Object>>[];
+    if(from!=null){reviewClauses.add('reviewed_at>=?');reviewVars.add(Variable.withString(dateKey(from)));}
+    if(to!=null){reviewClauses.add('reviewed_at<=?');reviewVars.add(Variable.withString(dateKey(to)));}
+    final reviewWhere=reviewClauses.isEmpty?'':'WHERE ${reviewClauses.join(' AND ')}';
+    final reviews=await rows('SELECT COUNT(*) AS count FROM study_reviews $reviewWhere',reviewVars);
     final row=totals.single;
     return {
       'sessions':(row['sessions'] as num).toInt(),
