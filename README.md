@@ -180,3 +180,18 @@ flutter analyze
 flutter test
 flutter run
 ```
+
+
+## Estabilização de segurança e navegação — 13/10/2026
+
+Esta revisão incremental aplica correções sobre a base existente, sem recriar o app nem alterar o namespace Android ou o schema SQLite:
+
+- **Biometria Android:** a Activity usa `FlutterFragmentActivity` e o manifesto declara `USE_BIOMETRIC`. A configuração considera suporte do aparelho e biometria efetivamente cadastrada, não apenas a presença de hardware.
+- **PIN local:** novos PINs usam PBKDF2-HMAC-SHA256 com salt aleatório e hash versionado. Hashes antigos em SHA-256 salgado continuam verificáveis e são atualizados após a validação bem-sucedida. Isso não criptografa o banco SQLite.
+- **Tentativas de PIN:** a contagem é persistida localmente; após cinco falhas há uma pausa de 30 segundos, com aumento progressivo até 15 minutos. Um PIN correto limpa o contador; desativar o bloqueio limpa a configuração de segurança.
+- **Tela de bloqueio:** usa a cor de fundo do tema atual para manter contraste no modo claro e escuro. Falhas da biometria mantêm o PIN como alternativa.
+- **Voltar no Android:** em uma aba principal diferente de Hoje, a primeira ação de voltar retorna à Home; na raiz da Home o comportamento padrão do Android é preservado.
+- **Home:** saudação corrigida para usar “Boa noite” entre 18:00 e 04:59 e atualizada enquanto a tela permanece aberta. O cartão “Foco do dia” agora tem uma única ação principal e o botão de criação rápida é compacto para reduzir sobreposição de conteúdo.
+- **Testes adicionados:** limites da saudação, compatibilidade dos hashes antigos, geração/verificação PBKDF2, persistência de tentativas e limpeza do bloqueio.
+
+**Validação pendente:** os testes Flutter, a análise estática e o build Android precisam ser executados em um ambiente com Flutter/Dart e Android SDK. A biometria, o retorno do background e o gesto físico de voltar também exigem validação em emulador/dispositivo; não devem ser considerados comprovados apenas por estas alterações de código.
