@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/database/orva_repository.dart';
+import '../../core/database/obligations_repository.dart';
+import '../../core/database/nutrition_repository.dart';
+import '../../core/domain/orva_calculations.dart';
+import '../obligations/obligations_page.dart';
+import '../nutrition/nutrition_page.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 
@@ -23,7 +28,17 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final blocks = await ref.read(repositoryProvider).getRoutineForDate(_selectedDate);
+      final repo = ref.read(repositoryProvider);
+      final values = await Future.wait<Object?>([
+        repo.getRoutineForDate(_selectedDate),
+        repo.getObligationTimeBlocksForDate(_selectedDate),
+        repo.getMealPlanTimeBlocksForDate(_selectedDate),
+      ]);
+      final blocks = <Map<String, Object?>>[
+        ...(values[0] as List<Map<String, Object?>>),
+        ...(values[1] as List<Map<String, Object?>>),
+        ...(values[2] as List<Map<String, Object?>>),
+      ]..sort((a, b) => intValue(a['start_minute']).compareTo(intValue(b['start_minute'])));
       if (!mounted) return;
       setState(() { _blocks = blocks; _loading = false; });
     } catch (error) { if (mounted) { setState(() => _loading = false); showOrvaError(context, error); } }
@@ -54,13 +69,17 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
 
   @override
   Widget build(BuildContext context) {
-    final totalMinutes = _blocks.fold<int>(0, (sum, b) => sum + intValue(b['end_minute']) - intValue(b['start_minute']));
+    final plannedIntervals = _blocks.map((block) => PlannedInterval(
+      intValue(block['start_minute']),
+      intValue(block['end_minute']),
+      (block['category'] as String?)?.trim().isNotEmpty == true
+          ? block['category'] as String
+          : 'Sem categoria',
+      block['title'] as String? ?? '',
+    )).toList();
+    final totalMinutes = occupiedMinutes(plannedIntervals);
     final overlaps = _findOverlaps();
-    final categoryMinutes = <String, int>{};
-    for (final block in _blocks) {
-      final category = (block['category'] as String?)?.trim().isNotEmpty == true ? block['category'] as String : 'Sem categoria';
-      categoryMinutes[category] = (categoryMinutes[category] ?? 0) + intValue(block['end_minute']) - intValue(block['start_minute']);
-    }
+    final categoryTotals = categoryMinutes(plannedIntervals);
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add), label: const Text('Novo bloco')),
       body: SafeArea(child: Column(children: [
@@ -103,11 +122,25 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
                 OrvaSectionHeader(title: 'Linha do tempo'),
                 const SizedBox(height: 12),
                 for (var index = 0; index < _blocks.length; index++) ...[
-                  _RoutineBlockCard(block: _blocks[index], viewingDate: _selectedDate, onEdit: () => _edit(_blocks[index]), onDuplicate: () => _edit(_blocks[index], true), onDelete: () async {
-                    final item = _blocks[index];
-                    final ok = await confirmAction(context, title: 'Excluir bloco?', message: 'O bloco “${item['title']}” será removido do planejamento.', actionLabel: 'Excluir', destructive: true);
-                    if (ok) { await ref.read(repositoryProvider).deleteRoutineBlock(item['id'] as String); await _load(); }
-                  }),
+                  if (_blocks[index]['block_kind'] == 'obligation' ||
+                      _blocks[index]['block_kind'] == 'mealPlan')
+                    _LinkedTimeBlockCard(
+                      block: _blocks[index],
+                      onOpen: () {
+                        final isObligation = _blocks[index]['block_kind'] == 'obligation';
+                        Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => isObligation
+                              ? const ObligationsPage()
+                              : const NutritionPage(),
+                        )).then((_) => _load());
+                      },
+                    )
+                  else
+                    _RoutineBlockCard(block: _blocks[index], viewingDate: _selectedDate, onEdit: () => _edit(_blocks[index]), onDuplicate: () => _edit(_blocks[index], true), onDelete: () async {
+                      final item = _blocks[index];
+                      final ok = await confirmAction(context, title: 'Excluir bloco?', message: 'O bloco “${item['title']}” será removido do planejamento.', actionLabel: 'Excluir', destructive: true);
+                      if (ok) { await ref.read(repositoryProvider).deleteRoutineBlock(item['id'] as String); await _load(); }
+                    }),
                   const SizedBox(height: 10),
                 ],
                 const SizedBox(height: 20),
@@ -116,17 +149,85 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
                 Text('Percentual calculado sobre $totalMinutes minutos planejados neste dia.', style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 12),
                 OrvaSurface(child: Column(children: [
-                  for (final entry in (categoryMinutes.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).indexed) ...[
+                  for (final entry in (categoryTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).indexed) ...[
                     Row(children: [Expanded(child: Text(entry.$2.key, style: Theme.of(context).textTheme.bodyLarge)), Text('${formatMinutes(entry.$2.value)} · ${totalMinutes == 0 ? '—' : (entry.$2.value / totalMinutes * 100).round()}%', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600))]),
                     const SizedBox(height: 8),
                     ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: totalMinutes == 0 ? 0 : entry.$2.value / totalMinutes, minHeight: 5, color: OrvaColors.information, backgroundColor: OrvaColors.primary100)),
-                    if (entry.$1 < categoryMinutes.length - 1) const SizedBox(height: 16),
+                    if (entry.$1 < categoryTotals.length - 1) const SizedBox(height: 16),
                   ],
                 ])),
                 const SizedBox(height: 18),
                 const OrvaSurface(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.info_outline_rounded, color: OrvaColors.information), SizedBox(width: 10), Expanded(child: Text('A rotina representa o que foi planejado. Para registrar tempo efetivamente realizado em hobbies, utilize o registro de sessões no módulo Hobbies.'))])),
               ]))),
       ])),
+    );
+  }
+}
+
+class _LinkedTimeBlockCard extends StatelessWidget {
+  const _LinkedTimeBlockCard({required this.block, required this.onOpen});
+
+  final Map<String, Object?> block;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = intValue(block['start_minute']);
+    final end = intValue(block['end_minute']);
+    final isObligation = block['block_kind'] == 'obligation';
+    final label = isObligation ? 'Obrigação' : 'Refeição planejada';
+    final icon = isObligation ? Icons.repeat_rounded : Icons.restaurant_outlined;
+    final color = isObligation ? OrvaColors.information : OrvaColors.terracotta;
+    return OrvaSurface(
+      padding: const EdgeInsets.all(0),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Container(
+          width: 4,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(
+                width: 62,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(formatClock(start), style: const TextStyle(fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text(formatClock(end), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace')),
+                  const SizedBox(height: 7),
+                  Text(formatMinutes(end - start), style: Theme.of(context).textTheme.bodySmall),
+                ]),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${block['title']}', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 5),
+                Row(children: [
+                  Icon(icon, size: 16, color: color),
+                  const SizedBox(width: 5),
+                  Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
+                ]),
+                const SizedBox(height: 6),
+                Text(
+                  isObligation
+                      ? 'Configurado em Obrigações recorrentes'
+                      : 'Definido no planejamento alimentar; não indica consumo realizado',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ])),
+              IconButton(
+                tooltip: isObligation ? 'Abrir obrigação' : 'Abrir alimentação',
+                onPressed: onOpen,
+                icon: const Icon(Icons.open_in_new_rounded),
+              ),
+            ]),
+          ),
+        ),
+      ]),
     );
   }
 }
