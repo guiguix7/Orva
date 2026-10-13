@@ -38,30 +38,35 @@ class _SecuritySettingsPageState extends ConsumerState<SecuritySettingsPage> {
   }
 
   Future<void> _load() async {
-    final repo = ref.read(repositoryProvider);
-    final lockEnabled = await repo.isLockEnabled();
-    final biometricEnabled = await repo.isBiometricEnabled();
-    bool biometricAvailable = false;
     try {
+      final repo = ref.read(repositoryProvider);
+      final lockEnabled = await repo.isLockEnabled();
+      final biometricEnabled = await repo.isBiometricEnabled();
       final auth = LocalAuthentication();
-      biometricAvailable = await OrvaBiometricSupport.canAuthenticate(auth);
+      final biometricAvailable =
+          await OrvaBiometricSupport.canAuthenticate(auth);
+
+      if (!mounted) return;
+      setState(() {
+        _lockEnabled = lockEnabled;
+        _biometricEnabled = biometricEnabled;
+        _biometricAvailable = biometricAvailable;
+        _loading = false;
+      });
     } catch (error, stackTrace) {
       OrvaDiagnostics.instance.recordException(
         error,
         stackTrace,
-        category: 'biometric-capability',
+        category: 'security-settings-load',
         module: 'security',
-        severity: DiagnosticSeverity.warning,
       );
-      biometricAvailable = false;
+      if (!mounted) return;
+      setState(() => _loading = false);
+      showOrvaMessage(
+        context,
+        'Não foi possível carregar as configurações de bloqueio. Tente novamente.',
+      );
     }
-    if (!mounted) return;
-    setState(() {
-      _lockEnabled = lockEnabled;
-      _biometricEnabled = biometricEnabled;
-      _biometricAvailable = biometricAvailable;
-      _loading = false;
-    });
   }
 
   Future<void> _setupPin() async {
