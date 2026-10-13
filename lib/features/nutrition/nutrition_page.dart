@@ -38,6 +38,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
   List<Map<String, Object?>> _allPlans = [];
   List<Map<String, Object?>> _consumptions = [];
   Map<String, Object?> _summary = {};
+  Map<String, Object?> _plannedSummary = {};
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
         repo.getMealPlans(),
         repo.getFoodConsumptionsForDate(_date),
         repo.getNutritionSummary(_date),
+        repo.getPlannedNutritionSummary(_date),
       ]);
       if (!mounted) return;
       setState(() {
@@ -63,6 +65,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
         _allPlans = values[2] as List<Map<String, Object?>>;
         _consumptions = values[3] as List<Map<String, Object?>>;
         _summary = values[4] as Map<String, Object?>;
+        _plannedSummary = values[5] as Map<String, Object?>;
         _loading = false;
       });
     } catch (error) {
@@ -540,6 +543,11 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
             children: [
               if (_tab == 'today') ...[
                 _NutritionSummary(summary: _summary),
+                const SizedBox(height: 10),
+                _PlanVsConsumptionComparison(
+                  planned: _plannedSummary,
+                  consumed: _summary,
+                ),
                 const SizedBox(height: 18),
                 Row(children: [
                   Expanded(child: Text('Refeições planejadas para este dia', style: Theme.of(context).textTheme.titleMedium)),
@@ -692,6 +700,89 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
       ],
     )),
   );
+}
+
+class _PlanVsConsumptionComparison extends StatelessWidget {
+  const _PlanVsConsumptionComparison({
+    required this.planned,
+    required this.consumed,
+  });
+
+  final Map<String, Object?> planned;
+  final Map<String, Object?> consumed;
+
+  String _calories(Object? value) {
+    if (value is! num) return 'Sem dados';
+    return '${value.toStringAsFixed(value % 1 == 0 ? 0 : 1)} kcal';
+  }
+
+  String _macros(Map<String, Object?> values) {
+    String quantity(String key) {
+      final value = values[key];
+      if (value is! num) return '—';
+      return value.toStringAsFixed(value % 1 == 0 ? 0 : 1);
+    }
+    return 'P ${quantity('protein_g')} g · C ${quantity('carbohydrates_g')} g · G ${quantity('fat_g')} g';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final plannedCount = intValue(planned['planCount']);
+    final consumedCount = intValue(consumed['consumptionCount']);
+    if (plannedCount == 0 && consumedCount == 0) {
+      return const SizedBox.shrink();
+    }
+    return OrvaSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Planejado × consumido', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 5),
+          Text(
+            'Dois registros independentes. A comparação descreve os dados registrados; não define uma meta nutricional.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Planejado', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('$plannedCount refeição(ões)', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 5),
+                    Text(_calories(planned['calories']), style: Theme.of(context).textTheme.titleSmall),
+                    Text(_macros(planned), style: Theme.of(context).textTheme.bodySmall),
+                    if (planned['isPartial'] == true)
+                      Text('Dados parciais', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: OrvaColors.terracotta)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Consumido', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('$consumedCount refeição(ões)', style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 5),
+                    Text(_calories(consumed['calories']), style: Theme.of(context).textTheme.titleSmall),
+                    Text(_macros(consumed), style: Theme.of(context).textTheme.bodySmall),
+                    if (consumed['isPartial'] == true)
+                      Text('Dados parciais', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: OrvaColors.terracotta)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _NutritionSummary extends StatelessWidget {
