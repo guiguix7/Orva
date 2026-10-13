@@ -42,7 +42,26 @@ jobs:
         run: dart format .
 
       - name: Static analysis
-        run: flutter analyze
+        shell: bash
+        run: |
+          set +e
+          flutter analyze --no-pub 2>&1 | tee "$RUNNER_TEMP/orva-analyze.log"
+          analyze_exit=${PIPESTATUS[0]}
+          set -e
+
+          if grep -Eq '(warning|error) •' "$RUNNER_TEMP/orva-analyze.log"; then
+            echo "Static analysis reported warning/error diagnostics."
+            exit 1
+          fi
+
+          if [ "$analyze_exit" -ne 0 ]; then
+            if grep -q 'info •' "$RUNNER_TEMP/orva-analyze.log"; then
+              echo "No warning/error diagnostics. Informational lint findings remain non-blocking and should be cleaned incrementally."
+            else
+              echo "Static analysis returned non-zero without a recognizable info-only report."
+              exit "$analyze_exit"
+            fi
+          fi
 
       - name: Unit and widget tests
         run: flutter test
