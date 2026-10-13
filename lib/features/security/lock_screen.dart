@@ -6,6 +6,7 @@ import 'package:local_auth/local_auth.dart';
 import '../../core/database/orva_repository.dart';
 import '../../core/logging/orva_diagnostics.dart';
 import '../../core/security/pin_security.dart';
+import '../../core/security/biometric_support.dart';
 import '../../core/theme/orva_theme.dart';
 
 /// Tela de desbloqueio por PIN (e biometria opcional). Não é apenas uma
@@ -40,13 +41,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
     if (!await repo.isBiometricEnabled() || !mounted) return;
     try {
       final auth = LocalAuthentication();
-      final supported = await auth.isDeviceSupported();
-      final canCheck = await auth.canCheckBiometrics;
-      if (!supported || !canCheck) return;
-      // Hardware support alone is insufficient: at least one biometric must
-      // actually be enrolled on this device.
-      final available = await auth.getAvailableBiometrics();
-      if (available.isEmpty || !mounted) return;
+      if (!await OrvaBiometricSupport.canAuthenticate(auth) || !mounted) return;
       final ok = await auth.authenticate(
         localizedReason: 'Desbloqueie o Orva',
         options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
