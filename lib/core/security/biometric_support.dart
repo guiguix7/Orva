@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../logging/orva_diagnostics.dart';
+
 /// Handles differences in Android's biometric enrollment APIs.
 ///
 /// On Android versions below 10 (API 29), local_auth documents that
@@ -30,7 +32,14 @@ abstract final class OrvaBiometricSupport {
 
       if (!await auth.canCheckBiometrics) return false;
       return (await auth.getAvailableBiometrics()).isNotEmpty;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'biometric-capability',
+        module: 'security',
+        severity: DiagnosticSeverity.warning,
+      );
       return false;
     }
   }
