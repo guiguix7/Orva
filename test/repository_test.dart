@@ -99,6 +99,20 @@ void main() {
     expect((await repository.getStudySessions()).single['goal_id'], goal['id']);
     expect((await repository.getStudyReviews()).single['confidence'], 4);
     expect((await repository.getStudySubjects()).single['total_minutes'], 75);
+
+    final savedSession = (await repository.getStudySessions()).single;
+    await repository.saveStudySession(
+      id: savedSession['id'] as String,
+      subjectId: subject['id'] as String,
+      topicId: topic['id'] as String,
+      goalId: goal['id'] as String,
+      sessionDate: DateTime(2026, 10, 13),
+      startMinute: 840,
+      durationMinutes: 80,
+      note: 'Sessão corrigida',
+    );
+    expect((await repository.getStudySessions()).single['duration_minutes'], 80);
+    expect((await repository.getStudySubjects()).single['total_minutes'], 80);
   });
 
   test('planned meal and consumed meal are separate; nutrition snapshots survive food edits', () async {
@@ -126,6 +140,14 @@ void main() {
     expect(plannedBlock['start_minute'], 480);
     expect(plannedBlock['end_minute'], 510);
     expect(plannedBlock['category'], 'Alimentação');
+    await repository.saveMealPlan(
+      title: 'Lanche sem horário',
+      mealType: 'snack',
+      recurrence: 'once',
+      plannedDate: '2026-10-13',
+    );
+    // A planned meal with no explicit start/duration must not occupy invented time.
+    expect(await repository.getMealPlanTimeBlocksForDate(DateTime(2026, 10, 13)), hasLength(1));
     await repository.addMealPlanItem(
       mealPlanId: plan['id'] as String,
       foodId: food['id'] as String,
@@ -226,6 +248,23 @@ void main() {
     expect(afterException.where((block) => block['continues_from_previous_day'] == 1), hasLength(1));
     await repository.clearObligationException(currentOccurrence['rule_id'] as String, nextDay);
     expect((await repository.getObligationOccurrencesForDate(nextDay)).single['status'], 'planned');
+
+    final occurrence = (await repository.getObligationOccurrencesForDate(nextDay)).single;
+    await repository.setObligationOccurrenceCompleted(occurrence['id'] as String, true);
+    await repository.saveObligationRule(
+      id: currentOccurrence['rule_id'] as String,
+      name: 'Sono atualizado',
+      category: 'Descanso',
+      startMinute: 22 * 60 + 30,
+      endMinute: 7 * 60 + 30,
+      recurrence: 'daily',
+      startDate: DateTime(2026, 10, 12),
+    );
+    final historical = (await repository.getObligationOccurrencesForDate(nextDay)).single;
+    expect(historical['status'], 'completed');
+    expect(historical['name_snapshot'], 'Sono');
+    final future = (await repository.getObligationOccurrencesForDate(DateTime(2026, 10, 14))).single;
+    expect(future['name_snapshot'], 'Sono atualizado');
   });
 
   test('version 3 backup imports with new modules empty and old local data intact', () async {
