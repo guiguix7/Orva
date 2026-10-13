@@ -119,8 +119,13 @@ void main() {
       weekdays: [2],
       startDate: '2026-10-13',
       plannedMinute: 480,
+      durationMinutes: 30,
     );
     final plan = (await repository.getMealPlansForDate(DateTime(2026, 10, 13))).single;
+    final plannedBlock = (await repository.getMealPlanTimeBlocksForDate(DateTime(2026, 10, 13))).single;
+    expect(plannedBlock['start_minute'], 480);
+    expect(plannedBlock['end_minute'], 510);
+    expect(plannedBlock['category'], 'Alimentação');
     await repository.addMealPlanItem(
       mealPlanId: plan['id'] as String,
       foodId: food['id'] as String,
@@ -153,6 +158,34 @@ void main() {
     expect(snapshot['food_name_snapshot'], 'Aveia');
     expect(snapshot['calories'], 570);
     expect((await repository.getMealPlansForDate(DateTime(2026, 10, 13))).length, 1);
+
+    await repository.saveFoodConsumption(
+      id: consumption['id'] as String,
+      consumedDate: DateTime(2026, 10, 13),
+      consumedMinute: 500,
+      mealType: 'breakfast',
+      title: 'Café corrigido',
+      note: 'Ajustei o horário, sem alterar os dados nutricionais históricos',
+      items: [
+        FoodQuantity(
+          foodId: snapshot['food_id'] as String?,
+          quantity: (snapshot['quantity'] as num).toDouble(),
+          snapshotName: snapshot['food_name_snapshot'] as String,
+          snapshotUnit: snapshot['unit'] as String,
+          snapshotQuantity: (snapshot['quantity'] as num).toDouble(),
+          snapshotCalories: snapshot['calories'],
+          snapshotProteinG: snapshot['protein_g'],
+          snapshotCarbohydratesG: snapshot['carbohydrates_g'],
+          snapshotFatG: snapshot['fat_g'],
+          snapshotFibreG: snapshot['fibre_g'],
+        ),
+      ],
+    );
+    final edited = (await repository.getFoodConsumptionsForDate(DateTime(2026, 10, 13))).single;
+    final editedItem = (await repository.getFoodConsumptionItems(edited['id'] as String)).single;
+    expect(edited['title'], 'Café corrigido');
+    expect(editedItem['food_name_snapshot'], 'Aveia');
+    expect(editedItem['calories'], 570);
   });
 
   test('overnight obligations split across dates and exceptions affect only one occurrence', () async {
