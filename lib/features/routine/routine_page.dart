@@ -130,8 +130,8 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
                         final isObligation = _blocks[index]['block_kind'] == 'obligation';
                         Navigator.of(context).push(MaterialPageRoute<void>(
                           builder: (_) => isObligation
-                              ? const ObligationsPage()
-                              : const NutritionPage(),
+                              ? ObligationsPage(initialDate: _selectedDate)
+                              : NutritionPage(initialDate: _selectedDate),
                         )).then((_) => _load());
                       },
                     )
