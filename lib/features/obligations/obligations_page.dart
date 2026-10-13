@@ -9,9 +9,6 @@ import '../../core/database/obligations_repository.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 
-String _obligationDateKey(DateTime date) =>
-    '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
 String _obligationTime(int minute) {
   final normalized = minute == 1440 ? 0 : minute;
   return '${(normalized ~/ 60).toString().padLeft(2, '0')}:${(normalized % 60).toString().padLeft(2, '0')}';
