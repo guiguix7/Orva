@@ -796,7 +796,13 @@ final class OrvaRepository {
 
   // Backup format is explicit and versioned. Import callers must confirm data
   // replacement with the user before calling importBackup.
-  static const backupVersion = 3;
+  static const backupVersion = 4;
+  static const _legacyBackupTablesV3 = <String>{
+    'categories','goals','goal_progress_history','checklists','checklist_items',
+    'checklist_occurrences','checklist_occurrence_items','routine_blocks','hobbies',
+    'routine_templates','routine_template_blocks','hobby_sessions','notes',
+    'journal_entries','weight_entries','settings',
+  };
   static const _backupTables = <String>[
     'categories',
     'goals',
@@ -813,6 +819,18 @@ final class OrvaRepository {
     'notes',
     'journal_entries',
     'weight_entries',
+    'study_subjects',
+    'study_topics',
+    'study_sessions',
+    'study_reviews',
+    'foods',
+    'meal_plans',
+    'meal_plan_items',
+    'food_consumptions',
+    'food_consumption_items',
+    'obligation_rules',
+    'obligation_exceptions',
+    'obligation_occurrences',
     'settings',
   ];
 
@@ -824,6 +842,8 @@ final class OrvaRepository {
     'security_pin_salt',
     'security_lock_enabled',
     'security_biometric_enabled',
+    'security_pin_failed_attempts',
+    'security_pin_lockout_until',
   };
 
   Future<Map<String, Object?>> exportBackup() async {
@@ -847,6 +867,29 @@ final class OrvaRepository {
   Future<void> importBackup(Object? decoded) async {
     if (decoded is! Map<String, dynamic> || decoded['format'] != 'orva_backup') {
       throw const FormatException('Este arquivo não é um backup válido do Orva.');
+    }
+    // v3 backups are upgraded in memory, adding empty collections for the
+    // newly introduced modules. Existing records are kept unchanged.
+    if (decoded['version'] == 3) {
+      final oldData = decoded['data'];
+      if (oldData is! Map<String, dynamic> ||
+          oldData.keys.toSet().length != _legacyBackupTablesV3.length ||
+          !oldData.keys.toSet().containsAll(_legacyBackupTablesV3)) {
+        throw const FormatException('A estrutura do backup v3 é incompatível.');
+      }
+      final upgradedData = Map<String, dynamic>.from(oldData);
+      for (final table in const [
+        'study_subjects','study_topics','study_sessions','study_reviews',
+        'foods','meal_plans','meal_plan_items','food_consumptions','food_consumption_items',
+        'obligation_rules','obligation_exceptions','obligation_occurrences',
+      ]) {
+        upgradedData[table] = <dynamic>[];
+      }
+      decoded = <String, dynamic>{
+        ...decoded,
+        'version': backupVersion,
+        'data': upgradedData,
+      };
     }
     if (decoded['version'] != backupVersion) {
       throw FormatException('Versão de backup não suportada: ${decoded['version']}.');
@@ -874,6 +917,18 @@ final class OrvaRepository {
       'notes': {'id','title','content','tags_json','created_at','updated_at'},
       'journal_entries': {'id','entry_date','content','mood','tags_json','created_at','updated_at'},
       'weight_entries': {'id','measured_at','weight_kg','note','created_at'},
+      'study_subjects': {'id','name','description','color_value','goal_id','is_active','created_at','updated_at'},
+      'study_topics': {'id','subject_id','parent_topic_id','name','description','status','order_index','created_at','updated_at'},
+      'study_sessions': {'id','subject_id','topic_id','goal_id','session_date','start_minute','duration_minutes','note','created_at','updated_at'},
+      'study_reviews': {'id','subject_id','topic_id','reviewed_at','review_kind','confidence','note','created_at'},
+      'foods': {'id','name','brand','reference_amount','reference_unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','nutrition_source','note','created_at','updated_at'},
+      'meal_plans': {'id','title','meal_type','recurrence','planned_date','weekdays_json','start_date','end_date','planned_minute','note','is_active','created_at','updated_at'},
+      'meal_plan_items': {'id','meal_plan_id','food_id','food_name_snapshot','quantity','unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','order_index'},
+      'food_consumptions': {'id','consumed_date','consumed_minute','meal_type','title','note','created_at','updated_at'},
+      'food_consumption_items': {'id','consumption_id','food_id','food_name_snapshot','quantity','unit','calories','protein_g','carbohydrates_g','fat_g','fibre_g','order_index'},
+      'obligation_rules': {'id','name','category','start_minute','end_minute','recurrence','weekdays_json','start_date','end_date','priority','is_active','created_at','updated_at'},
+      'obligation_exceptions': {'id','rule_id','occurrence_date','action','override_name','override_category','override_start_minute','override_end_minute','note','created_at','updated_at'},
+      'obligation_occurrences': {'id','rule_id','occurrence_date','name_snapshot','category_snapshot','start_minute','end_minute','ends_next_day','status','note_snapshot','created_at','updated_at'},
       'settings': {'setting_key','setting_value','updated_at'},
     };
 
@@ -900,8 +955,12 @@ final class OrvaRepository {
     await db.transaction(() async {
       await execute('PRAGMA defer_foreign_keys = ON');
       for (final table in [
+        'food_consumption_items','food_consumptions','meal_plan_items','meal_plans','foods',
+        'obligation_occurrences','obligation_exceptions','obligation_rules',
+        'study_reviews','study_sessions','study_topics','study_subjects',
         'checklist_occurrence_items','checklist_occurrences','checklist_items','checklists',
-        'goal_progress_history','routine_blocks','routine_template_blocks','routine_templates','hobby_sessions','hobbies','journal_entries','weight_entries','notes','goals','categories',
+        'goal_progress_history','routine_blocks','routine_template_blocks','routine_templates',
+        'hobby_sessions','hobbies','journal_entries','weight_entries','notes','goals','categories',
       ]) {
         await execute('DELETE FROM $table');
       }
