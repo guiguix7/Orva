@@ -25,7 +25,13 @@ Agenda, guia de estudos, notificações, gráficos históricos avançados, sincr
 - `file_picker`, `cross_file` e `share_plus` para selecionar e compartilhar backups.
 - Testes unitários, de widgets e um fluxo de integração de criação, leitura e exclusão de nota.
 
-O esquema SQLite está descrito explicitamente em `lib/core/database/app_database.dart`, atualmente na versão `2`, com criação e migração via `MigrationStrategy`. Essa opção evita depender de arquivos Dart gerados por `build_runner` neste ponto inicial. Se o banco evoluir, crie migrations versionadas e testes para cada upgrade.
+O esquema SQLite está descrito explicitamente em `lib/core/database/app_database.dart`, atualmente na versão `3`, com migrações versionadas via `MigrationStrategy` (inclui templates de rotina e registros de peso). Essa opção evita depender de arquivos Dart gerados por `build_runner` neste ponto inicial. Se o banco evoluir, crie migrations versionadas e testes para cada upgrade.
+
+## Estado da primeira estabilização
+
+As correções em andamento na branch `fix/phase-1-stability` centralizam as faixas horárias da saudação (incluindo 00:00–04:59 como “Boa noite”), atualizam dados com data local quando a Home atravessa a meia-noite, simplificam as ações do foco diário, retiram o botão flutuante que podia encobrir cartões e fazem o botão Voltar retornar à Home quando uma aba secundária está selecionada. Também foi adicionado tratamento de fallback para erros na tela de desbloqueio.
+
+Essas alterações precisam passar pela execução de `flutter analyze`, `flutter test` e build Android no CI antes de serem consideradas validadas. Login Google, agenda Google, hábitos, alimentação completa e o restante dos módulos descritos no Prompt Master permanecem requisitos maiores pendentes; não são declarados concluídos por esta estabilização.
 
 ## Como executar
 
