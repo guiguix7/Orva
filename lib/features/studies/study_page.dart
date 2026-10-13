@@ -487,22 +487,26 @@ class _StudyPageState extends ConsumerState<StudyPage> {
               children: [
                 if ((subject['description'] as String?)?.isNotEmpty == true)
                   Align(alignment: Alignment.centerLeft, child: Text(subject['description'] as String)),
-                Row(children: [
-                  TextButton.icon(onPressed: active ? () => _editTopic(subject) : null, icon: const Icon(Icons.add, size: 18), label: const Text('Assunto')),
-                  TextButton.icon(onPressed: active ? () => _logSession(subject['id'] as String) : null, icon: const Icon(Icons.timer_outlined, size: 18), label: const Text('Registrar')),
-                  TextButton.icon(onPressed: active ? () => _planStudyBlock(subject) : null, icon: const Icon(Icons.event_outlined, size: 18), label: const Text('Planejar')),
-                  const Spacer(),
-                  PopupMenuButton<String>(
-                    onSelected: (choice) {
-                      if (choice == 'edit') _editSubject(subject);
-                      if (choice == 'archive') _toggleArchive(subject);
-                    },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Editar matéria')),
-                      PopupMenuItem(value: 'archive', child: Text(active ? 'Arquivar' : 'Restaurar')),
-                    ],
-                  ),
-                ]),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    TextButton.icon(onPressed: active ? () => _editTopic(subject) : null, icon: const Icon(Icons.add, size: 18), label: const Text('Assunto')),
+                    TextButton.icon(onPressed: active ? () => _logSession(subject['id'] as String) : null, icon: const Icon(Icons.timer_outlined, size: 18), label: const Text('Registrar')),
+                    TextButton.icon(onPressed: active ? () => _planStudyBlock(subject) : null, icon: const Icon(Icons.event_outlined, size: 18), label: const Text('Planejar')),
+                    PopupMenuButton<String>(
+                      onSelected: (choice) {
+                        if (choice == 'edit') _editSubject(subject);
+                        if (choice == 'archive') _toggleArchive(subject);
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'edit', child: Text('Editar matéria')),
+                        PopupMenuItem(value: 'archive', child: Text(active ? 'Arquivar' : 'Restaurar')),
+                      ],
+                    ),
+                  ],
+                ),
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator()
                 else if (topics.isEmpty)
