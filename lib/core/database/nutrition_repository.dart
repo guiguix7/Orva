@@ -16,8 +16,9 @@ double? _nutritionScale(Object? perReference, double quantity, double referenceA
 }
 
 double? _nutrientTotal(List<Map<String, Object?>> items, String key) {
-  if (items.isEmpty || items.any((item) => item[key] == null)) return null;
-  return items.fold<double>(
+  final known = items.where((item) => item[key] is num).toList();
+  if (known.isEmpty) return null;
+  return known.fold<double>(
     0,
     (sum, item) => sum + (item[key] as num).toDouble(),
   );
