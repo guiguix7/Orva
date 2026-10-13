@@ -23,6 +23,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
   @override
   void dispose() { _search.dispose(); super.dispose(); }
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final entries = await ref.read(repositoryProvider).getJournalEntries(search: _search.text);
@@ -44,7 +45,25 @@ class _JournalPageState extends ConsumerState<JournalPage> {
           final entry = _entries[index];
           final tags = _decodeTags(entry['tags_json']);
           return OrvaSurface(onTap: () async { await showJournalEditor(context, ref, DateTime.parse(entry['entry_date'] as String), entry: entry); await _load(); }, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [Expanded(child: Text(_dateLabel(entry['entry_date'] as String), style: Theme.of(context).textTheme.titleMedium)), if ((entry['mood'] as String?)?.isNotEmpty == true) _MoodChip(mood: entry['mood'] as String), PopupMenuButton<String>(onSelected: (choice) async { if (choice == 'edit') { await showJournalEditor(context, ref, DateTime.parse(entry['entry_date'] as String), entry: entry); await _load(); } if (choice == 'delete') { final ok = await confirmAction(context, title: 'Excluir entrada?', message: 'Esta entrada do diário será removida permanentemente deste dispositivo.', actionLabel: 'Excluir', destructive: true); if (ok) { await ref.read(repositoryProvider).deleteJournalEntry(entry['id'] as String); await _load(); } } }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Editar')), PopupMenuItem(value: 'delete', child: Text('Excluir'))])]),
+            Row(children: [Expanded(child: Text(_dateLabel(entry['entry_date'] as String), style: Theme.of(context).textTheme.titleMedium)), if ((entry['mood'] as String?)?.isNotEmpty == true) _MoodChip(mood: entry['mood'] as String), PopupMenuButton<String>(onSelected: (choice) async {
+              if (choice == 'edit') {
+                await showJournalEditor(context, ref, DateTime.parse(entry['entry_date'] as String), entry: entry);
+                if (!mounted) return;
+                await _load();
+              } else if (choice == 'delete') {
+                final ok = await confirmAction(
+                  context,
+                  title: 'Excluir entrada?',
+                  message: 'Esta entrada do diário será removida permanentemente deste dispositivo.',
+                  actionLabel: 'Excluir',
+                  destructive: true,
+                );
+                if (!mounted || !ok) return;
+                await ref.read(repositoryProvider).deleteJournalEntry(entry['id'] as String);
+                if (!mounted) return;
+                await _load();
+              }
+            }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Editar')), PopupMenuItem(value: 'delete', child: Text('Excluir'))])]),
             const SizedBox(height: 8), Text('${entry['content']}', maxLines: 5, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyLarge),
             if (tags.isNotEmpty) ...[const SizedBox(height: 12), Wrap(spacing: 6, runSpacing: 6, children: tags.map((tag) => _JournalTag(label: tag)).toList())],
             const SizedBox(height: 10), Text('Atualizado em ${DateFormat('dd/MM/yyyy · HH:mm').format(DateTime.parse(entry['updated_at'] as String))}', style: Theme.of(context).textTheme.bodySmall),
