@@ -174,23 +174,34 @@ class _StudyPageState extends ConsumerState<StudyPage> {
     description.dispose();
   }
 
-  Future<void> _logSession([String? selectedSubject]) async {
+  Future<void> _logSession({
+    String? selectedSubject,
+    Map<String, Object?>? session,
+  }) async {
     final subjects = _subjects.where((s) => intValue(s['is_active']) == 1).toList();
     if (subjects.isEmpty) { showOrvaMessage(context, 'Crie uma matéria ativa antes de registrar um estudo.'); return; }
-    var subjectId = subjects.any((s) => s['id'] == selectedSubject) ? selectedSubject! : subjects.first['id'] as String;
+    final desiredSubject = session?['subject_id'] as String? ?? selectedSubject;
+    var subjectId = subjects.any((s) => s['id'] == desiredSubject)
+        ? desiredSubject!
+        : subjects.first['id'] as String;
     var topics = await ref.read(repositoryProvider).getStudyTopics(subjectId);
-    var topicId = '';
-    var goalId = '';
-    var date = DateTime.now();
-    var minute = date.hour * 60 + date.minute;
-    final duration = TextEditingController(text: '30');
-    final note = TextEditingController();
+    var topicId = session?['topic_id'] as String? ?? '';
+    if (!topics.any((topic) => topic['id'] == topicId)) topicId = '';
     final goals = await ref.read(repositoryProvider).getGoals(status: 'active');
+    var goalId = session?['goal_id'] as String? ?? '';
+    if (!goals.any((goal) => goal['id'] == goalId)) goalId = '';
+    var date = DateTime.tryParse(session?['session_date'] as String? ?? '') ?? DateTime.now();
+    var minute = (session?['start_minute'] as num?)?.toInt() ??
+        date.hour * 60 + date.minute;
+    final duration = TextEditingController(
+      text: session == null ? '30' : '${session['duration_minutes']}',
+    );
+    final note = TextEditingController(text: session?['note'] as String? ?? '');
     if (!mounted) { duration.dispose(); note.dispose(); return; }
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialog) => StatefulBuilder(builder: (context, setDialog) => AlertDialog(
-        title: const Text('Registrar sessão de estudo'),
+        title: Text(session == null ? 'Registrar sessão de estudo' : 'Editar sessão de estudo'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           DropdownButtonFormField<String>(
             value: subjectId,
@@ -251,13 +262,14 @@ class _StudyPageState extends ConsumerState<StudyPage> {
             final parsed = int.tryParse(duration.text);
             if (parsed == null || parsed < 1 || parsed > 1440) { showOrvaMessage(dialog, 'Informe uma duração entre 1 e 1440 minutos.'); return; }
             Navigator.pop(dialog, true);
-          }, child: const Text('Salvar sessão')),
+          }, child: Text(session == null ? 'Salvar sessão' : 'Salvar alterações')),
         ],
       )),
     );
     if (ok == true && mounted) {
       try {
         await ref.read(repositoryProvider).saveStudySession(
+          id: session?['id'] as String?,
           subjectId: subjectId,
           topicId: topicId.isEmpty ? null : topicId,
           goalId: goalId.isEmpty ? null : goalId,
@@ -493,7 +505,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     TextButton.icon(onPressed: active ? () => _editTopic(subject) : null, icon: const Icon(Icons.add, size: 18), label: const Text('Assunto')),
-                    TextButton.icon(onPressed: active ? () => _logSession(subject['id'] as String) : null, icon: const Icon(Icons.timer_outlined, size: 18), label: const Text('Registrar')),
+                    TextButton.icon(onPressed: active ? () => _logSession(selectedSubject: subject['id'] as String) : null, icon: const Icon(Icons.timer_outlined, size: 18), label: const Text('Registrar')),
                     TextButton.icon(onPressed: active ? () => _planStudyBlock(subject) : null, icon: const Icon(Icons.event_outlined, size: 18), label: const Text('Planejar')),
                     PopupMenuButton<String>(
                       onSelected: (choice) {
