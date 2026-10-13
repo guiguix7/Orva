@@ -20,13 +20,14 @@ String _obligationTime(int minute) {
 int _obligationDuration(int start, int end) => end > start ? end - start : 1440 - start + end;
 
 class ObligationsPage extends ConsumerStatefulWidget {
-  const ObligationsPage({super.key});
+  const ObligationsPage({super.key, this.initialDate});
+  final DateTime? initialDate;
   @override
   ConsumerState<ObligationsPage> createState() => _ObligationsPageState();
 }
 
 class _ObligationsPageState extends ConsumerState<ObligationsPage> {
-  DateTime _date = DateTime.now();
+  late DateTime _date = widget.initialDate ?? DateTime.now();
   String _tab = 'schedule';
   bool _archived = false;
   bool _loading = true;
