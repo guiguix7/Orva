@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
@@ -28,6 +29,7 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   bool _loading = true;
+  Timer? _homeClock;
   String? _userName;
   String? _focus;
   bool _focusCompleted = false;
@@ -43,6 +45,22 @@ class _HomePageState extends ConsumerState<HomePage> {
   void initState() {
     super.initState();
     _load();
+    // Keep the greeting and current-block marker live while Home remains mounted.
+    _homeClock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      final today = ref.read(repositoryProvider).dateKey(DateTime.now());
+      if (!_loading && _loadedDateKey != today) {
+        _load();
+      } else {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _homeClock?.cancel();
+    super.dispose();
   }
 
   @override
