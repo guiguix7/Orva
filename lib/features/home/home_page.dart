@@ -480,54 +480,157 @@ class _DayAllocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (routine.isEmpty) {
-      return const OrvaSurface(child: OrvaEmptyState(icon: Icons.donut_large_outlined, title: 'Ainda não há horários planejados', message: 'Adicione blocos à rotina para visualizar a ocupação e as horas não definidas.', compact: true));
+      return const OrvaSurface(
+        child: OrvaEmptyState(
+          icon: Icons.donut_large_outlined,
+          title: 'Ainda não há horários planejados',
+          message: 'Adicione blocos à rotina para visualizar a ocupação e as horas não definidas.',
+          compact: true,
+        ),
+      );
     }
-    final occupied = intValue(summary['plannedMinutes']);
+
+    final occupied = intValue(summary['plannedMinutes']).clamp(0, 1440);
     final free = 1440 - occupied;
     final raw = summary['plannedCategories'];
     final categories = raw is Map<String, int> ? raw : <String, int>{};
     final scheme = Theme.of(context).colorScheme;
-    final colors = [OrvaColors.primary, OrvaColors.information, OrvaColors.terracotta,
-      OrvaColors.mustard, OrvaColors.success, const Color(0xFF8B6B9E)];
-    return OrvaSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Ocupação das 24 horas', style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 6),
-      Text('Planejamento · horários sobrepostos contados uma única vez.', style: Theme.of(context).textTheme.bodySmall),
-      const SizedBox(height: 18),
-      Center(child: SizedBox(width: 154, height: 154, child: Stack(alignment: Alignment.center, children: [
-        SizedBox.expand(child: CustomPaint(painter: _DailyRingPainter(
-          minutes: categories.values.toList(), colors: colors,
-          freeMinutes: free, emptyColor: scheme.surfaceContainerHighest,
-        ))),
-        Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('${(occupied / 1440 * 100).round()}%', style: Theme.of(context).textTheme.headlineMedium),
-          Text('${formatMinutes(occupied)} planejadas', style: Theme.of(context).textTheme.bodySmall),
-        ]),
-      ]))),
-      const SizedBox(height: 18),
-      ...categories.entries.toList().asMap().entries.map((entry) {
-        final category = entry.value;
-        final related = routine.where((block) =>
-          ((block['category'] as String?)?.trim().isNotEmpty == true ? block['category'] : 'Sem categoria') == category.key).toList();
-        return ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          leading: CircleAvatar(radius: 6, backgroundColor: colors[entry.key % colors.length]),
-          title: Text(category.key, style: Theme.of(context).textTheme.bodyLarge),
-          trailing: Text(formatMinutes(category.value), style: Theme.of(context).textTheme.titleMedium),
-          children: related.map((block) => ListTile(
-            dense: true, title: Text('${block['title']}'),
-            subtitle: Text('${_homeClock(intValue(block['start_minute']))}–${_homeClock(intValue(block['end_minute']))} · horário planejado'),
-          )).toList(),
-        );
-      }),
-      const Divider(height: 20),
-      Row(children: [
-        Expanded(child: Text('Tempo não definido', style: Theme.of(context).textTheme.bodyLarge)),
-        Text(formatMinutes(free), style: Theme.of(context).textTheme.titleMedium),
-      ]),
-      const SizedBox(height: 5),
-      Text('Horas livres não são interpretadas como improdutividade.', style: Theme.of(context).textTheme.bodySmall),
-    ]));
+    final colors = [
+      OrvaColors.primary,
+      OrvaColors.information,
+      OrvaColors.terracotta,
+      OrvaColors.mustard,
+      OrvaColors.success,
+      const Color(0xFF8B6B9E),
+    ];
+
+    final ring = SizedBox(
+      width: 154,
+      height: 154,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: CustomPaint(
+              painter: _DailyRingPainter(
+                minutes: categories.values.toList(),
+                colors: colors,
+                freeMinutes: free,
+                emptyColor: scheme.surfaceContainerHighest,
+              ),
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${(occupied / 1440 * 100).round()}%',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              Text(
+                '${formatMinutes(occupied)} planejadas',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final categoryTiles = categories.entries.toList().asMap().entries.map((entry) {
+      final category = entry.value;
+      final related = routine.where((block) =>
+        ((block['category'] as String?)?.trim().isNotEmpty == true
+            ? block['category']
+            : 'Sem categoria') == category.key).toList();
+
+      return ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        leading: CircleAvatar(
+          radius: 6,
+          backgroundColor: colors[entry.key % colors.length],
+        ),
+        title: Text(
+          category.key,
+          style: Theme.of(context).textTheme.bodyLarge,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Text(
+          formatMinutes(category.value),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        children: related.map((block) => ListTile(
+          dense: true,
+          title: Text('${block['title']}'),
+          subtitle: Text(
+            '${_homeClock(intValue(block['start_minute']))}–${_homeClock(intValue(block['end_minute']))} · horário planejado',
+          ),
+        )).toList(),
+      );
+    }).toList();
+
+    return OrvaSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ocupação das 24 horas',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Planejamento · horários sobrepostos contados uma única vez.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth >= 500) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ring,
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: categoryTiles,
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Column(
+                children: [
+                  Center(child: ring),
+                  const SizedBox(height: 8),
+                  ...categoryTiles,
+                ],
+              );
+            },
+          ),
+          const Divider(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Tempo não definido',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
+              Text(formatMinutes(free), style: Theme.of(context).textTheme.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Horas livres não são interpretadas como improdutividade.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
   }
 }
 
