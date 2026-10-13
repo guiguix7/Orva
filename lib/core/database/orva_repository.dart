@@ -680,16 +680,30 @@ final class OrvaRepository {
   Future<void> setBiometricEnabled(bool enabled) => setSetting('security_biometric_enabled', enabled ? '1' : '0');
 
   Future<void> setPin({required String pinHash, required String pinSalt}) async {
-    await setSetting('security_pin_hash', pinHash);
-    await setSetting('security_pin_salt', pinSalt);
-    await setSetting('security_lock_enabled', '1');
+    // PIN hash, salt and enabled state must change atomically. A partially
+    // written setting must never leave the app believing a PIN is configured.
+    await db.transaction(() async {
+      await _writeSettingsAtomically({
+        'security_pin_hash': pinHash,
+        'security_pin_salt': pinSalt,
+        'security_lock_enabled': '1',
+        'security_pin_failed_attempts': '0',
+        'security_pin_lockout_until': '0',
+      });
+    });
   }
 
   Future<void> disableLock() async {
-    await setSetting('security_lock_enabled', '0');
-    await setSetting('security_pin_hash', '');
-    await setSetting('security_pin_salt', '');
-    await setSetting('security_biometric_enabled', '0');
+    await db.transaction(() async {
+      await _writeSettingsAtomically({
+        'security_lock_enabled': '0',
+        'security_pin_hash': '',
+        'security_pin_salt': '',
+        'security_biometric_enabled': '0',
+        'security_pin_failed_attempts': '0',
+        'security_pin_lockout_until': '0',
+      });
+    });
   }
 
   Future<({String hash, String salt})?> getPinHashAndSalt() async {
@@ -697,6 +711,64 @@ final class OrvaRepository {
     final salt = await getSetting('security_pin_salt');
     if (hash == null || salt == null || hash.isEmpty || salt.isEmpty) return null;
     return (hash: hash, salt: salt);
+  }
+
+  Future<void> _writeSettingsAtomically(Map<String, String> values) async {
+    final now = timestamp();
+    for (final entry in values.entries) {
+      await execute(
+        '''INSERT INTO settings(setting_key, setting_value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+          setting_value=excluded.setting_value, updated_at=excluded.updated_at''',
+        [entry.key, entry.value, now],
+      );
+    }
+  }
+
+  Future<int> getPinFailedAttempts() async =>
+      int.tryParse(await getSetting('security_pin_failed_attempts') ?? '') ?? 0;
+
+  Future<DateTime?> getPinLockoutUntil() async {
+    final milliseconds =
+        int.tryParse(await getSetting('security_pin_lockout_until') ?? '') ?? 0;
+    if (milliseconds <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+  }
+
+  /// Records a wrong PIN and applies an exponential pause from the fifth
+  /// failure onward. Values persist locally so restarting the app cannot
+  /// immediately reset the retry counter.
+  Future<DateTime?> recordPinFailure() async {
+    DateTime? lockoutUntil;
+    await db.transaction(() async {
+      final attempts = (int.tryParse(
+                await getSetting('security_pin_failed_attempts') ?? '',
+              ) ??
+              0) +
+          1;
+      final values = <String, String>{
+        'security_pin_failed_attempts': attempts.toString(),
+      };
+      if (attempts >= 5) {
+        final exponent = (attempts - 5).clamp(0, 5).toInt();
+        final seconds = (30 * (1 << exponent)).clamp(30, 900).toInt();
+        lockoutUntil = DateTime.now().add(Duration(seconds: seconds));
+        values['security_pin_lockout_until'] =
+            lockoutUntil!.millisecondsSinceEpoch.toString();
+      }
+      await _writeSettingsAtomically(values);
+    });
+    return lockoutUntil;
+  }
+
+  Future<void> resetPinFailures() async {
+    await db.transaction(() async {
+      await _writeSettingsAtomically({
+        'security_pin_failed_attempts': '0',
+        'security_pin_lockout_until': '0',
+      });
+    });
   }
 
   // Backup format is explicit and versioned. Import callers must confirm data
