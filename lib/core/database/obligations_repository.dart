@@ -229,7 +229,7 @@ extension ObligationsRepository on OrvaRepository {
       LEFT JOIN obligation_exceptions e ON e.rule_id=o.rule_id AND e.occurrence_date=o.occurrence_date
       WHERE o.occurrence_date=?
         AND (r.is_active=1 OR o.status='completed' OR o.occurrence_date<?)
-        ${includeSkipped?'':'AND o.status!=\\'skipped\\''}
+        ${includeSkipped ? '' : "AND o.status!='skipped'"}
       ORDER BY o.start_minute,o.name_snapshot COLLATE NOCASE
     ''',[
       Variable.withString(_dateKeyForObligation(date)),
