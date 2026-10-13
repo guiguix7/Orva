@@ -192,12 +192,15 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
   Future<void> _editPlan([Map<String, Object?>? plan]) async {
     final title = TextEditingController(text: plan?['title'] as String? ?? '');
     final note = TextEditingController(text: plan?['note'] as String? ?? '');
+    final durationController = TextEditingController(
+      text: plan?['duration_minutes'] == null ? '' : '${plan!['duration_minutes']}',
+    );
     var mealType = plan?['meal_type'] as String? ?? 'lunch';
     var recurrence = plan?['recurrence'] as String? ?? 'once';
     var plannedDate = DateTime.tryParse(plan?['planned_date'] as String? ?? '') ?? _date;
     var startDate = DateTime.tryParse(plan?['start_date'] as String? ?? '') ?? _date;
     var endDate = DateTime.tryParse(plan?['end_date'] as String? ?? '');
-    var minute = (plan?['planned_minute'] as num?)?.toInt() ?? 12 * 60;
+    int? minute = (plan?['planned_minute'] as num?)?.toInt();
     Set<int> weekdays = {};
     try {
       final raw = plan?['weekdays_json'] as String?;
@@ -209,7 +212,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
       }
     } catch (_) {}
     if (weekdays.isEmpty) weekdays = {_date.weekday};
-    if (!mounted) { title.dispose(); note.dispose(); return; }
+    if (!mounted) { title.dispose(); note.dispose(); durationController.dispose(); return; }
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialog) => StatefulBuilder(builder: (context, setDialog) => AlertDialog(
@@ -262,10 +265,37 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
             }, icon: const Icon(Icons.event_busy_outlined), label: Text(endDate == null ? 'Sem data final' : 'Termina em: ${DateFormat('dd/MM/yyyy','pt_BR').format(endDate!)}')),
             if (endDate != null) Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: () => setDialog(() => endDate = null), child: const Text('Remover data final'))),
           ],
-          OutlinedButton.icon(onPressed: () async {
-            final t = await showTimePicker(context: context, initialTime: TimeOfDay(hour: minute ~/ 60, minute: minute % 60));
-            if (t != null) setDialog(() => minute = t.hour * 60 + t.minute);
-          }, icon: const Icon(Icons.schedule_outlined), label: Text('Horário: ${formatClock(minute)}')),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final initial = minute == null
+                  ? const TimeOfDay(hour: 12, minute: 0)
+                  : TimeOfDay(hour: minute! ~/ 60, minute: minute! % 60);
+              final t = await showTimePicker(context: context, initialTime: initial);
+              if (t != null) setDialog(() => minute = t.hour * 60 + t.minute);
+            },
+            icon: const Icon(Icons.schedule_outlined),
+            label: Text(minute == null ? 'Adicionar horário' : 'Horário: ${formatClock(minute!)}'),
+          ),
+          if (minute != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => setDialog(() {
+                  minute = null;
+                  durationController.clear();
+                }),
+                child: const Text('Remover horário'),
+              ),
+            ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: durationController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Duração planejada (minutos, opcional)',
+              helperText: 'Só entra na ocupação do tempo quando houver horário e duração.',
+            ),
+          ),
           const SizedBox(height: 8),
           TextField(controller: note, maxLines: 2, decoration: const InputDecoration(labelText: 'Observações')),
         ])),
@@ -274,6 +304,22 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
           FilledButton(onPressed: () {
             if (title.text.trim().isEmpty) { showOrvaMessage(dialog, 'Informe o nome da refeição.'); return; }
             if ((recurrence == 'weekly') && weekdays.isEmpty) { showOrvaMessage(dialog, 'Selecione pelo menos um dia.'); return; }
+            final rawDuration = durationController.text.trim();
+            if (rawDuration.isNotEmpty) {
+              final parsed = int.tryParse(rawDuration);
+              if (parsed == null || parsed < 1 || parsed > 1440) {
+                showOrvaMessage(dialog, 'A duração deve ser um número inteiro entre 1 e 1440 minutos.');
+                return;
+              }
+              if (minute == null) {
+                showOrvaMessage(dialog, 'Defina um horário inicial para usar a duração na ocupação.');
+                return;
+              }
+              if (minute! + parsed > 1440) {
+                showOrvaMessage(dialog, 'O intervalo não pode atravessar a meia-noite. Ajuste o horário ou a duração.');
+                return;
+              }
+            }
             Navigator.pop(dialog, true);
           }, child: const Text('Salvar plano')),
         ],
@@ -291,6 +337,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
           startDate: recurrence == 'once' ? null : _dateKey(startDate),
           endDate: recurrence == 'once' || endDate == null ? null : _dateKey(endDate!),
           plannedMinute: minute,
+          durationMinutes: durationController.text.trim().isEmpty ? null : int.parse(durationController.text.trim()),
           note: note.text,
         );
         await _load();
@@ -298,6 +345,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
     }
     title.dispose();
     note.dispose();
+    durationController.dispose();
   }
 
   Future<void> _addPlanItem(Map<String, Object?> plan) async {
