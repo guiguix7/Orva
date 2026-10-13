@@ -408,7 +408,7 @@ class _ObligationsPageState extends ConsumerState<ObligationsPage> {
     final conflicts = _conflicts();
     return Scaffold(
       floatingActionButton: _tab == 'rules' && !_archived
-          ? FloatingActionButton.extended(onPressed: () => _editRule(), icon: const Icon(Icons.add), label: const Text('Nova obrigação'))
+          ? FloatingActionButton.extended(heroTag: 'obligations-create', onPressed: () => _editRule(), icon: const Icon(Icons.add), label: const Text('Nova obrigação'))
           : null,
       body: SafeArea(child: Column(children: [
         const OrvaPageHeader(title: 'Obrigações recorrentes', subtitle: 'Configure necessidades fixas uma vez e ajuste exceções por data. Nada é ativado sem sua escolha.'),

@@ -30,7 +30,7 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Categorias')),
-    floatingActionButton: FloatingActionButton.extended(onPressed: () async { await showCategoryEditor(context, ref, scope: _scope); await _load(); }, icon: const Icon(Icons.add), label: const Text('Nova categoria')),
+    floatingActionButton: FloatingActionButton.extended(heroTag: 'categories-create', onPressed: () async { await showCategoryEditor(context, ref, scope: _scope); await _load(); }, icon: const Icon(Icons.add), label: const Text('Nova categoria')),
     body: SafeArea(child: Column(children: [
       Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Personalize os nomes que organizam suas informações.', style: Theme.of(context).textTheme.bodyMedium),

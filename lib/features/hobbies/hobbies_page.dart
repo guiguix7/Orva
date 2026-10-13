@@ -31,7 +31,7 @@ class _HobbiesPageState extends ConsumerState<HobbiesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(onPressed: () async { await showHobbyEditor(context, ref); await _load(); }, icon: const Icon(Icons.add), label: const Text('Novo hobby')),
+      floatingActionButton: FloatingActionButton.extended(heroTag: 'hobbies-create', onPressed: () async { await showHobbyEditor(context, ref); await _load(); }, icon: const Icon(Icons.add), label: const Text('Novo hobby')),
       body: SafeArea(child: Column(children: [
         const OrvaPageHeader(title: 'Hobbies', subtitle: 'Tempo realizado, metas semanais e histórico pessoal.'),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: SegmentedButton<bool>(segments: const [ButtonSegment(value: false, label: Text('Ativos')), ButtonSegment(value: true, label: Text('Arquivados'))], selected: {_showArchived}, showSelectedIcon: false, onSelectionChanged: (value) { setState(() => _showArchived = value.first); _load(); })),

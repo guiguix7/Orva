@@ -579,6 +579,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: _archived ? null : FloatingActionButton.extended(
+        heroTag: 'studies-create',
         onPressed: () => _logSession(),
         icon: const Icon(Icons.timer_outlined),
         label: const Text('Registrar estudo'),

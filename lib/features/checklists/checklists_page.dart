@@ -51,7 +51,7 @@ class _ChecklistsPageState extends ConsumerState<ChecklistsPage> {
     final total = _todayItems.length;
     final done = _todayItems.where((item) => intValue(item['completed']) == 1).length;
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(onPressed: () async { await showChecklistEditor(context, ref); await _load(); }, icon: const Icon(Icons.add), label: const Text('Novo checklist')),
+      floatingActionButton: FloatingActionButton.extended(heroTag: 'checklists-create', onPressed: () async { await showChecklistEditor(context, ref); await _load(); }, icon: const Icon(Icons.add), label: const Text('Novo checklist')),
       body: SafeArea(child: Column(children: [
         OrvaPageHeader(title: 'Checklists', subtitle: DateFormat('EEEE, d MMMM', 'pt_BR').format(DateTime.now())),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: OrvaSurface(padding: const EdgeInsets.all(16), child: Row(children: [

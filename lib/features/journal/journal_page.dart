@@ -33,7 +33,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    floatingActionButton: FloatingActionButton.extended(onPressed: () async { await showJournalEditor(context, ref, DateTime.now()); await _load(); }, icon: const Icon(Icons.add), label: const Text('Escrever hoje')),
+    floatingActionButton: FloatingActionButton.extended(heroTag: 'journal-create', onPressed: () async { await showJournalEditor(context, ref, DateTime.now()); await _load(); }, icon: const Icon(Icons.add), label: const Text('Escrever hoje')),
     body: SafeArea(child: Column(children: [
       const OrvaPageHeader(title: 'Diário', subtitle: 'Um registro privado dos seus dias, ideias e reflexões.'),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: TextField(controller: _search, onChanged: (_) => _load(), decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Pesquisar registros', suffixIcon: _search.text.isEmpty ? null : IconButton(onPressed: () { _search.clear(); _load(); }, icon: const Icon(Icons.close))))),

@@ -59,6 +59,7 @@ class _GoalsPageState extends ConsumerState<GoalsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'goals-create',
         onPressed: () async { await showGoalEditor(context, ref); await _load(); },
         icon: const Icon(Icons.add), label: const Text('Nova meta'),
       ),

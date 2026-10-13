@@ -81,7 +81,7 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
     final overlaps = _findOverlaps();
     final categoryTotals = categoryMinutes(plannedIntervals);
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add), label: const Text('Novo bloco')),
+      floatingActionButton: FloatingActionButton.extended(heroTag: 'routine-create', onPressed: () => _edit(), icon: const Icon(Icons.add), label: const Text('Novo bloco')),
       body: SafeArea(child: Column(children: [
         OrvaPageHeader(
           title: 'Rotina',

@@ -509,10 +509,10 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
     }).toList();
     return Scaffold(
       floatingActionButton: _tab == 'today'
-          ? FloatingActionButton.extended(onPressed: () => _logConsumption(), icon: const Icon(Icons.restaurant_outlined), label: const Text('Registrar consumo'))
+          ? FloatingActionButton.extended(heroTag: 'nutrition-create', onPressed: () => _logConsumption(), icon: const Icon(Icons.restaurant_outlined), label: const Text('Registrar consumo'))
           : _tab == 'plans'
-              ? FloatingActionButton.extended(onPressed: () => _editPlan(), icon: const Icon(Icons.event_available_outlined), label: const Text('Planejar refeição'))
-              : FloatingActionButton.extended(onPressed: () => _editFood(), icon: const Icon(Icons.add), label: const Text('Novo alimento')),
+              ? FloatingActionButton.extended(heroTag: 'nutrition-create', onPressed: () => _editPlan(), icon: const Icon(Icons.event_available_outlined), label: const Text('Planejar refeição'))
+              : FloatingActionButton.extended(heroTag: 'nutrition-create', onPressed: () => _editFood(), icon: const Icon(Icons.add), label: const Text('Novo alimento')),
       body: SafeArea(child: Column(children: [
         const OrvaPageHeader(title: 'Alimentação e saúde', subtitle: 'Planejamento e consumo são registros diferentes. Valores desconhecidos não são inventados.'),
         Padding(

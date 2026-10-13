@@ -35,7 +35,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    floatingActionButton: FloatingActionButton.extended(onPressed: () async { await showNoteEditor(context, ref); await _load(); }, icon: const Icon(Icons.add), label: const Text('Nova nota')),
+    floatingActionButton: FloatingActionButton.extended(heroTag: 'notes-create', onPressed: () async { await showNoteEditor(context, ref); await _load(); }, icon: const Icon(Icons.add), label: const Text('Nova nota')),
     body: SafeArea(child: Column(children: [
       const OrvaPageHeader(title: 'Notas', subtitle: 'Ideias, informações e aprendizados — armazenados neste dispositivo.'),
       Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: TextField(controller: _search, onChanged: (_) => _load(), decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Pesquisar título ou conteúdo', suffixIcon: _search.text.isEmpty ? null : IconButton(icon: const Icon(Icons.close), onPressed: () { _search.clear(); _load(); }),),)),

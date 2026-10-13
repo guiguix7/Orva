@@ -224,6 +224,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       floatingActionButton: FloatingActionButton.small(
+        heroTag: 'home-quick-action',
         onPressed: _quickAction,
         tooltip: 'Criar algo novo',
         backgroundColor: OrvaColors.primary,

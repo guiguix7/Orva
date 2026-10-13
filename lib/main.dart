@@ -41,9 +41,21 @@ Future<void> main() async {
 
     await initializeDateFormatting('pt_BR');
     Intl.defaultLocale = 'pt_BR';
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } on UnsupportedError catch (error, stackTrace) {
+      // Firebase is optional for the local-first experience. Some platforms,
+      // including Web in this project, do not have generated Firebase options.
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'firebase-configuration',
+        module: 'startup',
+        severity: DiagnosticSeverity.warning,
+      );
+    }
     runApp(const ProviderScope(child: OrvaApp()));
   }, (error, stackTrace) {
     OrvaDiagnostics.instance.recordException(
