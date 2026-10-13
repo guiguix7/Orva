@@ -16,7 +16,8 @@ void main() {
       expect(result, contains('Bearer [redigido]'));
       expect(result, contains('[e-mail]'));
       expect(result, contains('PIN: [redigido]'));
-      expect(result, isNot(contains('abc123')));\n      expect(result, isNot(contains('topsecret')));
+      expect(result, isNot(contains('abc123')));
+      expect(result, isNot(contains('topsecret')));
       expect(result, isNot(contains('user@example.com')));
     });
 
