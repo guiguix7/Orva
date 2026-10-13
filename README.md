@@ -220,10 +220,10 @@ Os estados abaixo distinguem o que já existe no código do que esta revisão to
 | Metas | Parcialmente implementado | CRUD local, progresso manual, prazos sugeridos, metas superiores e histórico existentes. Progresso automático por sessões, agregação ponderada e fluxos semanais/mensais completos continuam pendentes. |
 | Checklists e hábitos | Parcialmente implementado | Ocorrências recorrentes e snapshots históricos existentes. Hábitos como módulo próprio, todas as regras de recorrência e estatísticas completas continuam pendentes. |
 | Rotina e calendário | Parcialmente implementado | Blocos locais, templates semanais, duplicação e conflito/ocupação básicos existentes. Grade interativa dia/semana/mês, eventos cruzando meia-noite, exceções de série e arrastar/redimensionar não estão concluídos. |
-| Obrigações e necessidades recorrentes | Não iniciado | Não há um mecanismo geral completo de obrigações com exceções, sono noturno cruzando datas e distinção por ocorrência. |
+| Obrigações e necessidades recorrentes | Implementado, aguardando validação | Regras locais de recorrência, snapshots de ocorrência, exceções por data (pular/alterar/remover), divisão de intervalos noturnos e integração na linha do tempo/ocupação. Falta validar em runtime, expandir regras avançadas e testar timezone/DST. |
 | Hobbies | Parcialmente implementado | Cadastro, sessões realizadas e metas semanais básicas existentes. Integração automática completa com metas e estatísticas históricas precisa ser construída. |
-| Estudos | Não iniciado | Módulo dedicado com matérias, tópicos, revisões e sessões não implementado. |
-| Alimentação/dieta | Não iniciado | Cadastro nutricional, refeições planejadas versus consumidas, planos e painel alimentar ainda não implementados. |
+| Estudos | Implementado, aguardando validação | Matérias, hierarquia de assuntos/subtópicos, estado, sessões reais, revisões, vínculo opcional com meta, resumo semanal e criação de blocos de estudo planejados na rotina. Ainda falta progressão automática de metas e testes de interface/integração. |
+| Alimentação/dieta | Implementado, aguardando validação | Catálogo de alimentos com fonte manual de nutrientes, planos recorrentes e pontuais, duração/horário opcional, itens com snapshots, registro/edição separado do consumo real e resumo diário de valores conhecidos/parciais. Ainda não há tabela nutricional online nem prescrição/recomendação dietética. |
 | Peso e IMC | Parcialmente implementado | Há registros locais de peso e uma função de cálculo de IMC. A camada de experiência/limitações por faixa etária e os gráficos precisam de validação/expansão. |
 | Estatísticas históricas | Parcialmente implementado | A Home oferece resumos locais; painéis semanais/mensais, comparação planejado-realizado e gráficos completos ainda não existem. |
 | Google Sign-In/Firebase Auth e onboarding | Bloqueado por configuração externa | O projeto contém dependências/configuração Firebase, mas o fluxo funcional de conta, onboarding e segregação de contas ainda não está implementado. São necessárias credenciais/configuração do proprietário e testes reais. |
@@ -237,3 +237,38 @@ Os estados abaixo distinguem o que já existe no código do que esta revisão to
 | Testes, analyze e build | Implementado, aguardando validação | Testes adicionais foram escritos para cálculos, hashes, limite de tentativas e sanitização. `flutter pub get`, `dart format`, `flutter analyze`, `flutter test` e build APK não foram executados neste ambiente. |
 
 Esta branch é uma **entrega parcial de estabilização (principalmente Fase 1)**, e não a conclusão integral das 35 partes do Prompt Master. As pendências da tabela continuam abertas e devem permanecer visíveis nos próximos ciclos de desenvolvimento.
+
+
+## Entrega incremental — Estudos, Alimentação e Obrigações
+
+Esta revisão acrescenta migração de schema 3 para 4 e telas reais para três áreas. Os registros são locais; nenhuma conta, API paga ou conjunto de dados fictícios foi introduzido.
+
+### Estudos
+- Cadastre e arquive matérias; opcionalmente vincule cada matéria a uma meta existente.
+- Organize assuntos e subtópicos hierárquicos, avance o estado de aprendizado e preserve assuntos que tenham histórico.
+- Registre uma sessão realizada com data, início, duração, observações e meta relacionada.
+- Registre revisões/testes/resumos com confiança de 1 a 5 e observações futuras.
+- Use **Planejar** para inserir um bloco datado na Rotina. O bloco planejado não cria uma sessão realizada nem incrementa automaticamente a meta.
+
+### Alimentação e saúde
+- Cadastre alimentos e informe apenas os valores nutricionais conhecidos; a origem dos valores fica visível. Não há busca em tabela externa e nenhum valor ausente é inferido.
+- Planeje refeições pontuais/recorrentes. A refeição só entra na ocupação do tempo se houver horário e duração explícitos.
+- Registre o que foi realmente consumido em separado do planejamento. Ao abrir um plano para registrar o consumo, os itens planejados aparecem como sugestões editáveis — o usuário confirma antes de salvar.
+- Corrija um registro de consumo preservando os snapshots nutricionais, mesmo se o alimento do catálogo foi alterado ou removido.
+- O resumo diário diferencia valores conhecidos de um total parcial; não deve ser interpretado como recomendação clínica ou nutricional.
+
+### Obrigações recorrentes
+- Cadastre uma regra única, diária ou semanal, com intervalo de início/fim, prioridade e período de vigência.
+- Um fim anterior ao início representa um intervalo que atravessa a meia-noite. O evento continua vinculado ao dia em que começou e é dividido em dois blocos apenas para mostrar a ocupação diária.
+- Para uma data específica, dispense a ocorrência, altere nome/categoria/horário só naquele dia ou remova a exceção.
+- A lista de histórico usa snapshots; editar a regra não reescreve ocorrências já concluídas.
+- Obrigações e refeições com duração explícita são mostradas junto da Rotina diária e entram no cálculo por união dos intervalos. Sobreposições são sinalizadas e não são somadas duas vezes no total líquido.
+- As sugestões “Sono”, “Escola” e “Refeição” apenas abrem um formulário; nada é ativado sem ação do usuário.
+
+### Banco e backup
+- Schema 4 é aditivo: as tabelas anteriores são mantidas e uma migration cria apenas as tabelas dos novos módulos.
+- Backup agora usa versão 4, inclui as tabelas novas e exclui dados de autenticação local.
+- Importação de backup versão 3 cria coleções vazias para os módulos novos e preserva os dados que já existiam no arquivo antigo.
+
+### Testes adicionados
+Os testes de repositório cobrem hierarquia/sessões/revisões de estudo, separação entre planejamento e consumo com snapshots nutricionais, projeção de intervalos noturnos/exceções e migração de backup v3. Os testes foram escritos, mas ainda não executados porque a toolchain Flutter/Dart não está disponível neste ambiente.
