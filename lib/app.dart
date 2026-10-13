@@ -173,7 +173,18 @@ class _MainShellState extends ConsumerState<MainShell> {
       const GoalsPage(),
       const MorePage(),
     ];
-    return Scaffold(
+    return PopScope<Object?>(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        // Nas abas secundárias, voltar primeiro leva à Home. Na raiz, o Android
+        // mantém o comportamento nativo de saída do aplicativo.
+        if (didPop || _selectedIndex == 0 || !mounted) return;
+        setState(() {
+          _selectedIndex = 0;
+          _navigationRevision++;
+        });
+      },
+      child: Scaffold(
       body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -200,6 +211,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             label: 'Mais',
           ),
         ],
+      ),
       ),
     );
   }
