@@ -14,6 +14,8 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>O Orva usa o Face ID para permitir o desbloqueio local do aplicativo.</string>
 	<key>CFBundleName</key>
 	<string>Orva</string>
 	<key>CFBundlePackageType</key>
