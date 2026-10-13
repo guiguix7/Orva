@@ -36,6 +36,21 @@ void main() {
       expect(diagnostics.events.last.message, 'message 1');
     });
 
+    test('exception logging omits arbitrary private exception messages', () {
+      diagnostics.clear();
+      diagnostics.recordException(
+        ArgumentError.value('conteúdo íntimo do diário', 'entry'),
+        StackTrace.current,
+        category: 'database',
+        module: 'repository',
+      );
+
+      final exported = diagnostics.exportText();
+      expect(exported, contains('ArgumentError'));
+      expect(exported, contains('detalhes omitidos para proteger dados pessoais'));
+      expect(exported, isNot(contains('conteúdo íntimo do diário')));
+    });
+
     test('exports only sanitized event fields', () {
       diagnostics.clear();
       diagnostics.record(
