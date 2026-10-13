@@ -108,11 +108,13 @@ class OrvaDiagnostics extends ChangeNotifier {
   String exportText() => events.map((event) => event.toExportLine()).join('\n\n');
 
   static String sanitize(String value) {
-    var sanitized = value.replaceAllMapped(
+    // Redact Bearer values first so an "Authorization: Bearer ..." header
+    // cannot lose the word Bearer before the token itself is removed.
+    var sanitized = value.replaceAll(_bearerPattern, 'Bearer [redigido]');
+    sanitized = sanitized.replaceAllMapped(
       _credentialPattern,
       (match) => (match.group(1) ?? '') + '[redigido]',
     );
-    sanitized = sanitized.replaceAll(_bearerPattern, 'Bearer [redigido]');
     sanitized = sanitized.replaceAll(_emailPattern, '[e-mail]');
     if (sanitized.length > 4000) {
       sanitized = sanitized.substring(0, 4000) + '…';
