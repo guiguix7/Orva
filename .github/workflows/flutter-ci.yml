@@ -41,11 +41,5 @@ jobs:
       - name: Run unit and widget tests
         run: flutter test --no-pub
 
-      - name: Build Android debug APK when Firebase native config is supplied
-        shell: bash
-        run: |
-          if [[ -f android/app/google-services.json ]]; then
-            flutter build apk --debug --no-pub
-          else
-            echo "::notice title=Android build not run::android/app/google-services.json is not present in this checkout. Supply the project-owned Firebase configuration to validate the native Android build."
-          fi
+      - name: Build Android debug APK
+        run: flutter build apk --debug --no-pub
