@@ -38,7 +38,7 @@ class PinSecurity {
   /// Verifies both the current PBKDF2 format and the legacy salted SHA-256
   /// format. The legacy format is accepted only for migration after login.
   static bool verify(String pin, String storedHash, String storedSalt) {
-    final parts = storedHash.split(r'\u0024');
+    final parts = storedHash.split(r'$');
     if (parts.length == 3 && parts[0] == _format) {
       final rounds = int.tryParse(parts[1]);
       // Bound work when reading a hash from local storage. Refuse suspicious
