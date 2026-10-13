@@ -29,7 +29,7 @@ O esquema SQLite está descrito explicitamente em `lib/core/database/app_databas
 
 ## Estado da primeira estabilização
 
-As correções em andamento na branch `fix/phase-1-stability` centralizam as faixas horárias da saudação (incluindo 00:00–04:59 como “Boa noite”), atualizam dados com data local quando a Home atravessa a meia-noite, simplificam as ações do foco diário, retiram o botão flutuante que podia encobrir cartões e fazem o botão Voltar retornar à Home quando uma aba secundária está selecionada. Também foi adicionado tratamento de fallback para erros na tela de desbloqueio.
+As correções em andamento na branch `fix/phase-1-stability` centralizam as faixas horárias da saudação (incluindo 00:00–04:59 como “Boa noite”), atualizam dados com data local quando a Home atravessa a meia-noite, simplificam as ações do foco diário, retiram o botão flutuante que podia encobrir cartões e fazem o botão Voltar retornar à Home quando uma aba secundária está selecionada. Também foram adicionados tratamento de fallback para erros na tela de desbloqueio, limitação progressiva de tentativas de PIN persistida localmente, derivação PBKDF2-HMAC-SHA256 para novos hashes com migração transparente de hashes legados após um desbloqueio bem-sucedido e exclusão da telemetria Firebase Analytics embutida diretamente no Gradle.
 
 Essas alterações precisam passar pela execução de `flutter analyze`, `flutter test` e build Android no CI antes de serem consideradas validadas. Login Google, agenda Google, hábitos, alimentação completa e o restante dos módulos descritos no Prompt Master permanecem requisitos maiores pendentes; não são declarados concluídos por esta estabilização.
 
@@ -62,7 +62,7 @@ Este ambiente de preparação não contém o executável `flutter` nem `dart`; p
 - Os dados da aplicação ficam no banco SQLite local do dispositivo. Não há conta, sincronização, telemetria ou envio de notas/diário para serviços externos neste MVP.
 - Armazenamento local não significa que o banco esteja criptografado. O conteúdo do diário e das notas deve ser tratado como dado privado no dispositivo.
 - A importação valida o formato e a versão do backup, solicita confirmação e aplica substituição em transação. Se qualquer inserção falhar, a transação deve reverter a alteração.
-- O backup inclui tabelas e vínculos do schema atual. A versão de formato atual é `2`; arquivos com outras versões são recusados em vez de importados silenciosamente.
+- O backup inclui tabelas e vínculos do schema atual. A versão de formato atual é `3`; arquivos com outras versões são recusados em vez de importados silenciosamente.
 
 ## Decisões de implementação
 
