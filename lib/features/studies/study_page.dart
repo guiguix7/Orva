@@ -401,7 +401,6 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         if (mounted) showOrvaError(context, error);
       }
     }
-    dateController.dispose();
     duration.dispose();
   }
 
