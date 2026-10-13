@@ -26,6 +26,7 @@ class _DeveloperConsolePageState extends State<DeveloperConsolePage> {
   }
 
   Future<void> _clear() async {
+    if (_diagnostics.events.isEmpty) return;
     final confirmed = await confirmAction(
       context,
       title: 'Limpar o console?',
@@ -73,12 +74,12 @@ class _DeveloperConsolePageState extends State<DeveloperConsolePage> {
         actions: [
           IconButton(
             tooltip: 'Exportar diagnóstico sanitizado',
-            onPressed: _diagnostics.events.isEmpty ? null : _export,
+            onPressed: _export,
             icon: const Icon(Icons.ios_share_outlined),
           ),
           IconButton(
             tooltip: 'Limpar registros',
-            onPressed: _diagnostics.events.isEmpty ? null : _clear,
+            onPressed: _clear,
             icon: const Icon(Icons.delete_sweep_outlined),
           ),
         ],
