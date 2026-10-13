@@ -22,6 +22,19 @@ void main() {
     expect(occupiedMinutes(const []), 0);
   });
 
+  test('greeting follows Orva local-time boundaries, including after midnight', () {
+    expect(greetingForHour(0), 'Boa noite');
+    expect(greetingForHour(4), 'Boa noite');
+    expect(greetingForHour(5), 'Bom dia');
+    expect(greetingForHour(11), 'Bom dia');
+    expect(greetingForHour(12), 'Boa tarde');
+    expect(greetingForHour(17), 'Boa tarde');
+    expect(greetingForHour(18), 'Boa noite');
+    expect(greetingForHour(23), 'Boa noite');
+    expect(() => greetingForHour(-1), throwsRangeError);
+    expect(() => greetingForHour(24), throwsRangeError);
+  });
+
   test('theme changes based on local time', () {
     expect(isNightTheme(DateTime(2026, 10, 12, 6, 59)), true);
     expect(isNightTheme(DateTime(2026, 10, 12, 7)), false);

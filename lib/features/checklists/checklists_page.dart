@@ -430,8 +430,7 @@ Future<void> showChecklistDetails(BuildContext context, WidgetRef ref, Map<Strin
                   Expanded(
                     child: ReorderableListView.builder(
                       itemCount: items.length,
-                      onReorder: (oldIndex, newIndex) async {
-                        if (newIndex > oldIndex) newIndex--;
+                      onReorderItem: (oldIndex, newIndex) async {
                         final item = items.removeAt(oldIndex);
                         items.insert(newIndex, item);
                         await repo.reorderChecklistItems(items.map((e) => e['id'] as String).toList());

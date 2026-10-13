@@ -68,7 +68,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ));
       if (mounted && result.status == ShareResultStatus.success) {
         showOrvaMessage(context, 'O backup foi enviado ao destino escolhido.');
-      } else if (mounted && result.status == ShareResultStatus.dismissed) showOrvaMessage(context, 'Compartilhamento cancelado. O banco local não foi alterado.');
+      } else if (mounted && result.status == ShareResultStatus.dismissed) {
+        showOrvaMessage(context, 'Compartilhamento cancelado. O banco local não foi alterado.');
+      }
     } catch (error) { if (mounted) showOrvaError(context, error); }
     finally { if (mounted) setState(() => _busy = false); }
   }
@@ -117,15 +119,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 24),
         Text('Aparência', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 10),
-        OrvaSurface(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Column(children: [
-          RadioListTile<String>(value: 'light', groupValue: _theme, title: const Text('Claro'), secondary: const Icon(Icons.light_mode_outlined), onChanged: (value) => setState(() => _theme = value ?? 'light'), contentPadding: EdgeInsets.zero),
-          const Divider(height: 1),
-          RadioListTile<String>(value: 'dark', groupValue: _theme, title: const Text('Escuro'), secondary: const Icon(Icons.dark_mode_outlined), onChanged: (value) => setState(() => _theme = value ?? 'dark'), contentPadding: EdgeInsets.zero),
-          const Divider(height: 1),
-          RadioListTile<String>(value: 'system', groupValue: _theme, title: const Text('Seguir sistema'), secondary: const Icon(Icons.brightness_6_outlined), onChanged: (value) => setState(() => _theme = value ?? 'system'), contentPadding: EdgeInsets.zero),
-          const Divider(height: 1),
-          RadioListTile<String>(value: 'dayNight', groupValue: _theme, title: const Text('Automático por horário'), subtitle: const Text('Claro das 07h às 19h e escuro à noite'), secondary: const Icon(Icons.nights_stay_outlined), onChanged: (value) => setState(() => _theme = value ?? 'dayNight'), contentPadding: EdgeInsets.zero),
-        ])),
+        OrvaSurface(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: RadioGroup<String>(
+            groupValue: _theme,
+            onChanged: (value) => setState(() => _theme = value ?? 'light'),
+            child: Column(children: [
+              RadioListTile<String>(
+                value: 'light',
+                title: const Text('Claro'),
+                secondary: const Icon(Icons.light_mode_outlined),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const Divider(height: 1),
+              RadioListTile<String>(
+                value: 'dark',
+                title: const Text('Escuro'),
+                secondary: const Icon(Icons.dark_mode_outlined),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const Divider(height: 1),
+              RadioListTile<String>(
+                value: 'system',
+                title: const Text('Seguir sistema'),
+                secondary: const Icon(Icons.brightness_6_outlined),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const Divider(height: 1),
+              RadioListTile<String>(
+                value: 'dayNight',
+                title: const Text('Automático por horário'),
+                subtitle: const Text('Claro das 07h às 19h e escuro à noite'),
+                secondary: const Icon(Icons.nights_stay_outlined),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ]),
+          ),
+        ),
         const SizedBox(height: 14),
         OrvaSurface(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2), child: SwitchListTile(
           contentPadding: EdgeInsets.zero,

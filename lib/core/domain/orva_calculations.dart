@@ -9,6 +9,15 @@ DateTime addCalendarMonths(DateTime date, int months) {
   return DateTime(first.year, first.month, day);
 }
 
+/// Greeting for local device hour, matching Orva's 05:00/12:00/18:00 boundaries.
+/// Hours outside 0..23 are rejected so invalid clocks cannot silently show a greeting.
+String greetingForHour(int hour) {
+  if (hour < 0 || hour > 23) throw RangeError.range(hour, 0, 23, 'hour');
+  if (hour >= 5 && hour < 12) return 'Bom dia';
+  if (hour >= 12 && hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
 DateTime? suggestedGoalDeadline(String period, DateTime start) => switch (period) {
   'daily' => DateTime(start.year, start.month, start.day),
   'weekly' => DateTime(start.year, start.month, start.day + 7),

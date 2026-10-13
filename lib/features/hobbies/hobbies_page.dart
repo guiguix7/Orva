@@ -20,6 +20,7 @@ class _HobbiesPageState extends ConsumerState<HobbiesPage> {
   @override
   void initState() { super.initState(); _load(); }
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final hobbies = await ref.read(repositoryProvider).getWeeklyHobbyMinutes(date: DateTime.now(), includeArchived: _showArchived);
@@ -56,16 +57,42 @@ class _HobbiesPageState extends ConsumerState<HobbiesPage> {
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${hobby['name']}', style: Theme.of(context).textTheme.titleMedium), if ((hobby['category'] as String?)?.isNotEmpty == true) Text('${hobby['category']}', style: Theme.of(context).textTheme.bodySmall)])),
                     Text(formatMinutes(actual), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: OrvaColors.terracotta)),
                     PopupMenuButton<String>(onSelected: (choice) async {
-                      if (choice == 'edit') { await showHobbyEditor(context, ref, hobby: hobby); await _load(); }
-                      if (choice == 'session') { await showHobbySessionEditor(context, ref, hobby); await _load(); }
-                      if (choice == 'archive') {
-                        final ok = await confirmAction(context, title: 'Arquivar hobby?', message: 'O hobby sairá da lista ativa. O histórico de sessões será preservado.', actionLabel: 'Arquivar');
-                        if (ok) { await ref.read(repositoryProvider).archiveHobby(hobby['id'] as String); await _load(); }
-                      }
-                      if (choice == 'restore') { await ref.read(repositoryProvider).setHobbyActive(hobby['id'] as String, true); await _load(); }
-                      if (choice == 'delete') {
-                        final ok = await confirmAction(context, title: 'Excluir hobby e sessões?', message: 'O hobby e todos os registros de tempo associados serão removidos permanentemente.', actionLabel: 'Excluir', destructive: true);
-                        if (ok) { await ref.read(repositoryProvider).deleteHobby(hobby['id'] as String); await _load(); }
+                      if (!mounted) return;
+                      if (choice == 'edit') {
+                        await showHobbyEditor(context, ref, hobby: hobby);
+                        if (!mounted) return;
+                        await _load();
+                      } else if (choice == 'session') {
+                        await showHobbySessionEditor(context, ref, hobby);
+                        if (!mounted) return;
+                        await _load();
+                      } else if (choice == 'archive') {
+                        final ok = await confirmAction(
+                          context,
+                          title: 'Arquivar hobby?',
+                          message: 'O hobby sairá da lista ativa. O histórico de sessões será preservado.',
+                          actionLabel: 'Arquivar',
+                        );
+                        if (!mounted || !ok) return;
+                        await ref.read(repositoryProvider).archiveHobby(hobby['id'] as String);
+                        if (!mounted) return;
+                        await _load();
+                      } else if (choice == 'restore') {
+                        await ref.read(repositoryProvider).setHobbyActive(hobby['id'] as String, true);
+                        if (!mounted) return;
+                        await _load();
+                      } else if (choice == 'delete') {
+                        final ok = await confirmAction(
+                          context,
+                          title: 'Excluir hobby e sessões?',
+                          message: 'O hobby e todos os registros de tempo associados serão removidos permanentemente.',
+                          actionLabel: 'Excluir',
+                          destructive: true,
+                        );
+                        if (!mounted || !ok) return;
+                        await ref.read(repositoryProvider).deleteHobby(hobby['id'] as String);
+                        if (!mounted) return;
+                        await _load();
                       }
                     }, itemBuilder: (_) => [
                       if (!isArchived) const PopupMenuItem(value: 'session', child: Text('Registrar sessão')),

@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orva/core/security/pin_security.dart';
 import 'package:orva/features/quotes/quotes_data.dart';
@@ -8,7 +11,8 @@ void main() {
       final salt = PinSecurity.generateSalt();
       final hash = PinSecurity.hash('1234', salt);
       expect(hash, isNot('1234'));
-      expect(hash.length, 64); // sha256 hex digest
+      expect(hash, startsWith('pbkdf2-sha256\$100000\$'));
+      expect(hash.split('\$').last.length, 64); // 32-byte derived key
     });
 
     test('verify accepts the correct PIN and rejects a wrong one', () {
@@ -16,6 +20,14 @@ void main() {
       final hash = PinSecurity.hash('4821', salt);
       expect(PinSecurity.verify('4821', hash, salt), true);
       expect(PinSecurity.verify('0000', hash, salt), false);
+    });
+
+    test('verifies a legacy salted SHA-256 hash for transparent upgrade', () {
+      const pin = '7391';
+      const salt = '00112233445566778899aabbccddeeff';
+      final legacyHash = sha256.convert(utf8.encode('$salt:$pin')).toString();
+      expect(PinSecurity.verify(pin, legacyHash, salt), true);
+      expect(PinSecurity.verify('7392', legacyHash, salt), false);
     });
 
     test('same PIN with different salts produces different hashes', () {
@@ -32,6 +44,11 @@ void main() {
       expect(PinSecurity.validatePinFormat('12ab'), isNotNull);
       expect(PinSecurity.validatePinFormat('1234'), isNull);
       expect(PinSecurity.validatePinFormat('12345678'), isNull);
+    });
+
+    test('rejects malformed PBKDF2 metadata before deriving a key', () {
+      expect(PinSecurity.verify('1234', 'pbkdf2-sha256\$999999999\$invalid', 'salt'), false);
+      expect(PinSecurity.verify('1234', 'pbkdf2-sha256\$short\$invalid', 'salt'), false);
     });
   });
 
