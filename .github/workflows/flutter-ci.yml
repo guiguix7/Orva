@@ -1,0 +1,51 @@
+name: Flutter CI
+
+on:
+  push:
+    branches:
+      - main
+      - "fix/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart and Flutter code
+        run: flutter analyze --no-pub
+
+      - name: Run unit and widget tests
+        run: flutter test --no-pub
+
+      - name: Build Android debug APK when Firebase native config is supplied
+        shell: bash
+        run: |
+          if [[ -f android/app/google-services.json ]]; then
+            flutter build apk --debug --no-pub
+          else
+            echo "::notice title=Android build not run::android/app/google-services.json is not present in this checkout. Supply the project-owned Firebase configuration to validate the native Android build."
+          fi
