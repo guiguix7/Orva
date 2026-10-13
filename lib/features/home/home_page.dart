@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../core/database/orva_repository.dart';
 import '../../core/domain/orva_calculations.dart';
 import '../../core/database/obligations_repository.dart';
+import '../../core/database/nutrition_repository.dart';
 import '../obligations/obligations_page.dart';
 import '../nutrition/nutrition_page.dart';
 import '../studies/study_page.dart';
@@ -83,14 +84,17 @@ class _HomePageState extends ConsumerState<HomePage> {
         repo.getRoutineForDate(now),
         repo.getWeeklyHobbyMinutes(date: now),
         repo.getObligationTimeBlocksForDate(now),
+        repo.getMealPlanTimeBlocksForDate(now),
       ]);
       if (!mounted) return;
       final routineBlocks = values[5] as List<Map<String, Object?>>;
       final hobbyRows = values[6] as List<Map<String, Object?>>;
       final obligationBlocks = values[7] as List<Map<String, Object?>>;
+      final mealPlanBlocks = values[8] as List<Map<String, Object?>>;
       final allBlocks = <Map<String, Object?>>[
         ...routineBlocks,
         ...obligationBlocks,
+        ...mealPlanBlocks,
       ]..sort((a, b) => intValue(a['start_minute']).compareTo(intValue(b['start_minute'])));
       final intervals = allBlocks.map((block) => PlannedInterval(
         intValue(block['start_minute']),
