@@ -94,7 +94,14 @@ class _LockScreenState extends ConsumerState<LockScreen> {
         return;
       }
 
-      if (PinSecurity.verify(_controller.text, stored.hash, stored.salt)) {
+      final pin = _controller.text;
+      final formatError = PinSecurity.validatePinFormat(pin);
+      if (formatError != null) {
+        if (mounted) setState(() => _error = formatError);
+        return;
+      }
+
+      if (PinSecurity.verify(pin, stored.hash, stored.salt)) {
         // A correct PIN must still unlock if a maintenance write fails. Retry
         // counters and legacy-hash upgrades are best-effort after verification.
         try {
@@ -102,7 +109,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
           if (PinSecurity.needsUpgrade(stored.hash)) {
             final salt = PinSecurity.generateSalt();
             await repo.setPin(
-              pinHash: PinSecurity.hash(_controller.text, salt),
+              pinHash: PinSecurity.hash(pin, salt),
               pinSalt: salt,
             );
           }
