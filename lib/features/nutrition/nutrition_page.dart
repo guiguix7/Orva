@@ -813,6 +813,54 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
     setState(()=>_items.add(FoodQuantity(foodId:_foodId,quantity:quantity)));
   }
 
+  Future<void> _editItemQuantity(int index) async {
+    final item = _items[index];
+    final controller = TextEditingController(text: item.quantity.toString());
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text('Quantidade de ${item.snapshotName ?? _selectedFood?['name'] ?? 'alimento'}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: 'Quantidade (${item.snapshotUnit ?? _selectedFood?['reference_unit'] ?? ''})',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () {
+            final value = _parseNullableDouble(controller.text);
+            if (value == null || value <= 0) {
+              showOrvaMessage(dialog, 'Informe uma quantidade positiva.');
+              return;
+            }
+            Navigator.pop(dialog, true);
+          }, child: const Text('Salvar')),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      final quantity = _parseNullableDouble(controller.text)!;
+      setState(() {
+        _items[index] = FoodQuantity(
+          foodId: item.foodId,
+          quantity: quantity,
+          snapshotName: item.snapshotName,
+          snapshotUnit: item.snapshotUnit,
+          snapshotQuantity: item.snapshotQuantity ?? item.quantity,
+          snapshotCalories: item.snapshotCalories,
+          snapshotProteinG: item.snapshotProteinG,
+          snapshotCarbohydratesG: item.snapshotCarbohydratesG,
+          snapshotFatG: item.snapshotFatG,
+          snapshotFibreG: item.snapshotFibreG,
+        );
+      });
+    }
+    controller.dispose();
+  }
+
   Future<void> _save() async{
     if(_title.text.trim().isEmpty){showOrvaMessage(context,'Informe o nome da refeição.');return;}
     setState(()=>_saving=true);
@@ -908,7 +956,21 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
               contentPadding:EdgeInsets.zero,
               title:Text(food?['name'] as String? ?? entry.value.snapshotName ?? 'Alimento removido'),
               subtitle:Text('${entry.value.quantity} ${food?['reference_unit'] ?? entry.value.snapshotUnit ?? ''}'),
-              trailing:IconButton(tooltip:'Remover item',onPressed:()=>setState(() { _items.removeAt(entry.key); }),icon:const Icon(Icons.close)),
+              trailing:Wrap(
+                spacing: 0,
+                children: [
+                  IconButton(
+                    tooltip: 'Editar quantidade',
+                    onPressed: () => _editItemQuantity(entry.key),
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'Remover item',
+                    onPressed: () => setState(() { _items.removeAt(entry.key); }),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
             );
           }),
         ],
