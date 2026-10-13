@@ -120,94 +120,36 @@ class _LockScreenState extends ConsumerState<LockScreen> {
     setState(() { _checking = true; _error = null; });
     try {
       final repo = ref.read(repositoryProvider);
-      // Re-read the timestamp before every attempt, so a quick tap or cold
-      // restart cannot bypass a persisted lockout.
+      // Re-read lockout state before every attempt so a cold restart or
+      // repeated tap cannot bypass the persisted cooldown.
       final rawLockUntil = await repo.getSetting(_lockUntilKey);
       final persistedLockUntil = DateTime.tryParse(rawLockUntil ?? '');
       if (persistedLockUntil != null && persistedLockUntil.isAfter(DateTime.now())) {
         _startCooldown(persistedLockUntil);
         if (mounted) {
-          setState(() => _error =
-              'Muitas tentativas. Tente novamente em $_remainingSeconds s.');
+          setState(() => _error = 'Muitas tentativas. Tente novamente em $_remainingSeconds s.');
         }
         return;
       }
 
       final stored = await repo.getPinHashAndSalt();
       if (stored == null) {
-        // Nenhum PIN configurado (estado inconsistente) — não bloqueia o usuário.
+        // Preserve recovery for the inconsistent state where no PIN hash exists.
         widget.onUnlocked();
         return;
       }
-      if (PinSecurity.verify(_controller.text, stored.hash, stored.salt)) {
-        // Upgrade legacy SHA-256 PINs only after the supplied PIN was verified.
-        // A failed migration must not lock a legitimate user out of local data.
-        if (!stored.hash.startsWith('pbkdf2-sha256\
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                width: 58, height: 58,
-                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(18)),
-                child: Icon(Icons.lock_outline_rounded, color: Theme.of(context).colorScheme.onPrimary, size: 26),
-              ),
-              const SizedBox(height: 20),
-              Text('Orva está bloqueado', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text(
-                _remainingSeconds > 0
-                    ? 'O acesso por PIN será liberado quando o intervalo de segurança terminar.'
-                    : 'Digite seu PIN para continuar.',
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: 220,
-                child: TextField(
-                  controller: _controller,
-                  autofocus: _remainingSeconds == 0,
-                  enabled: !_checking && _remainingSeconds == 0,
-                  obscureText: true,
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(8)],
-                  style: orvaMonoStyle(fontSize: 22, letterSpacing: 6),
-                  decoration: InputDecoration(errorText: _error, counterText: ''),
-                  onSubmitted: (_) => _submit(),
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: 220,
-                child: FilledButton(
-                  onPressed: _checking || _remainingSeconds > 0 ? null : _submit,
-                  child: _checking
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(_remainingSeconds > 0 ? 'Tente em ${_remainingSeconds}s' : 'Desbloquear'),
-                ),
-              ),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-}
-)) {
+      final enteredPin = _controller.text;
+      if (PinSecurity.verify(enteredPin, stored.hash, stored.salt)) {
+        // Upgrade a legacy hash only after the entered PIN was verified.
+        if (!stored.hash.startsWith('pbkdf2-sha256\$')) {
           try {
             await repo.setPin(
-              pinHash: PinSecurity.hash(_controller.text, stored.salt),
+              pinHash: PinSecurity.hash(enteredPin, stored.salt),
               pinSalt: stored.salt,
             );
-          } catch (_) {}
+          } catch (_) {
+            // A storage hiccup during hash upgrade must not deny local access.
+          }
         }
         try {
           await repo.execute(
@@ -217,11 +159,11 @@ class _LockScreenState extends ConsumerState<LockScreen> {
         } catch (_) {}
         widget.onUnlocked();
       } else {
-        final previous = int.tryParse(
+        final priorAttempts = int.tryParse(
               await repo.getSetting(_failedAttemptsKey) ?? '0',
             ) ??
             0;
-        final failedAttempts = previous + 1;
+        final failedAttempts = priorAttempts + 1;
         await repo.setSetting(_failedAttemptsKey, '$failedAttempts');
         if (failedAttempts >= 5) {
           final seconds = switch (failedAttempts - 5) {
@@ -235,14 +177,10 @@ class _LockScreenState extends ConsumerState<LockScreen> {
           await repo.setSetting(_lockUntilKey, until.toIso8601String());
           _startCooldown(until);
           if (mounted) {
-            setState(() => _error =
-                'Muitas tentativas. Tente novamente em $_remainingSeconds s.');
+            setState(() => _error = 'Muitas tentativas. Tente novamente em $_remainingSeconds s.');
           }
-        } else {
-          if (mounted) {
-            setState(() => _error =
-                'PIN incorreto. Tentativa $failedAttempts de 5.');
-          }
+        } else if (mounted) {
+          setState(() => _error = 'PIN incorreto. Tentativa $failedAttempts de 5.');
         }
         _controller.clear();
       }
@@ -266,24 +204,46 @@ class _LockScreenState extends ConsumerState<LockScreen> {
             padding: const EdgeInsets.all(28),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Container(
-                width: 58, height: 58,
-                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(18)),
-                child: Icon(Icons.lock_outline_rounded, color: Theme.of(context).colorScheme.onPrimary, size: 26),
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  Icons.lock_outline_rounded,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  size: 26,
+                ),
               ),
               const SizedBox(height: 20),
-              Text('Orva está bloqueado', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
+              Text(
+                'Orva está bloqueado',
+                style: Theme.of(context).textTheme.headlineMedium,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 8),
-              Text('Digite seu PIN para continuar.', style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                _remainingSeconds > 0
+                    ? 'O acesso por PIN será liberado quando o intervalo de segurança terminar.'
+                    : 'Digite seu PIN para continuar.',
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 22),
               SizedBox(
                 width: 220,
                 child: TextField(
                   controller: _controller,
-                  autofocus: true,
+                  autofocus: _remainingSeconds == 0,
+                  enabled: !_checking && _remainingSeconds == 0,
                   obscureText: true,
                   textAlign: TextAlign.center,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(8)],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(8),
+                  ],
                   style: orvaMonoStyle(fontSize: 22, letterSpacing: 6),
                   decoration: InputDecoration(errorText: _error, counterText: ''),
                   onSubmitted: (_) => _submit(),
@@ -293,8 +253,18 @@ class _LockScreenState extends ConsumerState<LockScreen> {
               SizedBox(
                 width: 220,
                 child: FilledButton(
-                  onPressed: _checking ? null : _submit,
-                  child: _checking ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Desbloquear'),
+                  onPressed: _checking || _remainingSeconds > 0 ? null : _submit,
+                  child: _checking
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          _remainingSeconds > 0
+                              ? 'Tente em ${_remainingSeconds}s'
+                              : 'Desbloquear',
+                        ),
                 ),
               ),
             ]),
