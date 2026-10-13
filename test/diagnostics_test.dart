@@ -47,7 +47,7 @@ void main() {
 
       final exported = diagnostics.exportText();
       expect(exported, contains('ERROR'));
-      expect(exported, contains('Bearer') == false);
+      expect(exported, isNot(contains('Bearer')));
       expect(exported, contains('refresh_token=[redigido]'));
       expect(exported, isNot(contains('private-value')));
     });
