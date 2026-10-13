@@ -32,7 +32,7 @@ class PinSecurity {
       salt: utf8.encode(salt),
       rounds: iterations,
     );
-    return '$_format\u0024$iterations\u0024${_toHex(derived)}';
+    return '$_format' + r'$' + iterations.toString() + r'$' + _toHex(derived);
   }
 
   /// Verifies both the current PBKDF2 format and the legacy salted SHA-256
@@ -60,7 +60,7 @@ class PinSecurity {
   }
 
   static bool needsUpgrade(String storedHash) =>
-      !storedHash.startsWith('$_format\u0024');
+      !storedHash.startsWith('$_format' + r'$');
 
   /// Validates a PIN with 4 to 8 numeric digits.
   static String? validatePinFormat(String pin) {
