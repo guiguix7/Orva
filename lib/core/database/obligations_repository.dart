@@ -112,8 +112,6 @@ extension ObligationsRepository on OrvaRepository {
           DELETE FROM obligation_occurrences
           WHERE rule_id=? AND occurrence_date>=? AND status!='completed'
         ''',[id,_dateKeyForObligation(DateTime.now())]);
-        await execute('DELETE FROM obligation_exceptions WHERE rule_id=? AND occurrence_date>=?',
-          [id,_dateKeyForObligation(DateTime.now())]);
       }
     });
   }
@@ -241,10 +239,15 @@ extension ObligationsRepository on OrvaRepository {
     await _ensureObligationsForDate(previous);
     final today=await getObligationOccurrencesForDate(target,includeSkipped:false);
     final yesterday=await rows('''
-      SELECT * FROM obligation_occurrences
-      WHERE occurrence_date=? AND ends_next_day=1 AND end_minute>0 AND status!='skipped'
-      ORDER BY start_minute
-    ''',[Variable.withString(_dateKeyForObligation(previous))]);
+      SELECT o.* FROM obligation_occurrences o
+      JOIN obligation_rules r ON r.id=o.rule_id
+      WHERE o.occurrence_date=? AND o.ends_next_day=1 AND o.end_minute>0 AND o.status!='skipped'
+        AND (r.is_active=1 OR o.status='completed' OR o.occurrence_date<?)
+      ORDER BY o.start_minute
+    ''',[
+      Variable.withString(_dateKeyForObligation(previous)),
+      Variable.withString(_dateKeyForObligation(DateTime.now())),
+    ]);
     final blocks=<Map<String,Object?>>[];
     for(final occurrence in today){
       final start=(occurrence['start_minute'] as num).toInt();
