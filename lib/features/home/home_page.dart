@@ -490,7 +490,7 @@ class _DayAllocationCard extends StatelessWidget {
       );
     }
 
-    final occupied = intValue(summary['plannedMinutes']).clamp(0, 1440);
+    final occupied = intValue(summary['plannedMinutes']).clamp(0, 1440).toInt();
     final free = 1440 - occupied;
     final raw = summary['plannedCategories'];
     final categories = raw is Map<String, int> ? raw : <String, int>{};
