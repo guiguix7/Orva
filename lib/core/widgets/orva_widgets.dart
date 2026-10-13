@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/orva_theme.dart';
+import '../logging/orva_diagnostics.dart';
 
 class OrvaPageHeader extends StatelessWidget {
   const OrvaPageHeader({super.key, required this.title, this.subtitle, this.trailing});
@@ -124,7 +125,15 @@ Future<bool> confirmAction(BuildContext context, {required String title, require
 }
 
 void showOrvaError(BuildContext context, Object error) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Não foi possível concluir: $error')));
+  OrvaDiagnostics.instance.recordException(
+    error,
+    StackTrace.current,
+    category: 'ui-operation',
+    module: 'presentation',
+  );
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Não foi possível concluir esta ação. Tente novamente.')),
+  );
 }
 
 void showOrvaMessage(BuildContext context, String message) {

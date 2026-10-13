@@ -173,33 +173,41 @@ class _MainShellState extends ConsumerState<MainShell> {
       const GoalsPage(),
       const MorePage(),
     ];
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _goTo,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.wb_sunny_outlined),
-            selectedIcon: Icon(Icons.wb_sunny),
-            label: 'Hoje',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.checklist_outlined),
-            selectedIcon: Icon(Icons.checklist),
-            label: 'Checklists',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.flag_outlined),
-            selectedIcon: Icon(Icons.flag),
-            label: 'Metas',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view_rounded),
-            label: 'Mais',
-          ),
-        ],
+    return PopScope<Object?>(
+      // At the root, Android may exit normally. From another main tab, the
+      // first Back returns to Home instead of closing the app accidentally.
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _selectedIndex != 0) _goTo(0);
+      },
+      child: Scaffold(
+        body: IndexedStack(index: _selectedIndex, children: pages),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: _goTo,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.wb_sunny_outlined),
+              selectedIcon: Icon(Icons.wb_sunny),
+              label: 'Hoje',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.checklist_outlined),
+              selectedIcon: Icon(Icons.checklist),
+              label: 'Checklists',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.flag_outlined),
+              selectedIcon: Icon(Icons.flag),
+              label: 'Metas',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.grid_view_outlined),
+              selectedIcon: Icon(Icons.grid_view_rounded),
+              label: 'Mais',
+            ),
+          ],
+        ),
       ),
     );
   }

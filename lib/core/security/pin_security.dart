@@ -1,15 +1,9 @@
-/// Hashing local do PIN de bloqueio do aplicativo.
+/// Secure local PIN hashing for the Orva app.
 ///
-/// O PIN nunca é armazenado em texto puro (ver requisito 7 do prompt
-/// mestre). Aqui usamos SHA-256 com um salt aleatório de 16 bytes por
-/// dispositivo/configuração, seguindo o padrão comum de "salted hash" —
-/// isso impede que o valor salvo em `settings` seja revertido para o PIN
-/// original apenas lendo o banco local.
-///
-/// Limitação documentada: isto protege o PIN armazenado, mas não é
-/// criptografia do banco de dados como um todo. O conteúdo das demais
-/// tabelas (diário, notas, saúde) continua em texto plano no SQLite local,
-/// como já indicado na tela de Configurações. Não prometa mais do que isso.
+/// New PINs use PBKDF2-HMAC-SHA256 with a per-PIN random salt. The legacy
+/// salted SHA-256 format remains verifiable so an existing user's PIN keeps
+/// working; callers can transparently upgrade the hash after a successful
+/// verification. This does not encrypt the SQLite database itself.
 library;
 
 import 'dart:convert';
@@ -21,27 +15,91 @@ class PinSecurity {
 
   static final Random _random = Random.secure();
 
-  /// Gera um salt aleatório (32 caracteres hex = 16 bytes).
+  static const String _format = 'pbkdf2-sha256';
+  static const int iterations = 120000;
+  static const int _maxAcceptedIterations = 500000;
+
+  /// Generates a salt from 16 cryptographically secure random bytes.
   static String generateSalt() {
     final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
     return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
-  /// Calcula o hash SHA-256 de `salt + pin`.
+  /// Returns a versioned PBKDF2-HMAC-SHA256 representation.
   static String hash(String pin, String salt) {
-    final digest = sha256.convert(utf8.encode('$salt:$pin'));
-    return digest.toString();
+    final derived = _pbkdf2(
+      password: utf8.encode(pin),
+      salt: utf8.encode(salt),
+      rounds: iterations,
+    );
+    return '$_format' + r'$' + iterations.toString() + r'$' + _toHex(derived);
   }
 
-  /// Confere se o PIN informado corresponde ao hash armazenado.
+  /// Verifies both the current PBKDF2 format and the legacy salted SHA-256
+  /// format. The legacy format is accepted only for migration after login.
   static bool verify(String pin, String storedHash, String storedSalt) {
-    return hash(pin, storedSalt) == storedHash;
+    final parts = storedHash.split(r'$');
+    if (parts.length == 3 && parts[0] == _format) {
+      final rounds = int.tryParse(parts[1]);
+      // Bound work when reading a hash from local storage. Refuse suspicious
+      // values rather than allowing a corrupted file to freeze the UI.
+      if (rounds == null || rounds < iterations || rounds > _maxAcceptedIterations) {
+        return false;
+      }
+      final actual = _toHex(_pbkdf2(
+        password: utf8.encode(pin),
+        salt: utf8.encode(storedSalt),
+        rounds: rounds,
+      ));
+      return _constantTimeEquals(actual, parts[2]);
+    }
+
+    // Backward compatibility with Orva builds that stored sha256("$salt:$pin").
+    final legacy = sha256.convert(utf8.encode('$storedSalt:$pin')).toString();
+    return _constantTimeEquals(legacy, storedHash);
   }
 
-  /// Validação mínima de formato: 4 a 8 dígitos numéricos.
+  static bool needsUpgrade(String storedHash) =>
+      !storedHash.startsWith('$_format' + r'$');
+
+  /// Validates a PIN with 4 to 8 numeric digits.
   static String? validatePinFormat(String pin) {
     if (pin.isEmpty) return 'Informe um PIN.';
-    if (!RegExp(r'^\d{4,8}$').hasMatch(pin)) return 'O PIN deve ter de 4 a 8 dígitos numéricos.';
+    if (!RegExp(r'^\d{4,8}$').hasMatch(pin)) {
+      return 'O PIN deve ter de 4 a 8 dígitos numéricos.';
+    }
     return null;
+  }
+
+  static List<int> _pbkdf2({
+    required List<int> password,
+    required List<int> salt,
+    required int rounds,
+  }) {
+    final hmac = Hmac(sha256, password);
+    final firstBlock = <int>[...salt, 0, 0, 0, 1];
+    var u = hmac.convert(firstBlock).bytes;
+    final output = List<int>.from(u);
+    for (var round = 1; round < rounds; round++) {
+      u = hmac.convert(u).bytes;
+      for (var i = 0; i < output.length; i++) {
+        output[i] ^= u[i];
+      }
+    }
+    return output;
+  }
+
+  static String _toHex(List<int> bytes) =>
+      bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+  static bool _constantTimeEquals(String left, String right) {
+    var difference = left.length ^ right.length;
+    final length = max(left.length, right.length);
+    for (var i = 0; i < length; i++) {
+      final a = i < left.length ? left.codeUnitAt(i) : 0;
+      final b = i < right.length ? right.codeUnitAt(i) : 0;
+      difference |= a ^ b;
+    }
+    return difference == 0;
   }
 }

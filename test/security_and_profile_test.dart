@@ -1,14 +1,25 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orva/core/security/pin_security.dart';
 import 'package:orva/features/quotes/quotes_data.dart';
 
 void main() {
   group('PinSecurity', () {
-    test('never stores the PIN in plain text; hash is derived with salt', () {
+    test('new PINs use a versioned slow hash, not plain text', () {
       final salt = PinSecurity.generateSalt();
       final hash = PinSecurity.hash('1234', salt);
+      final separator = String.fromCharCode(36);
       expect(hash, isNot('1234'));
-      expect(hash.length, 64); // sha256 hex digest
+      expect(
+        hash.startsWith(
+          'pbkdf2-sha256' + separator + PinSecurity.iterations.toString() + separator,
+        ),
+        isTrue,
+      );
+      expect(hash.substring(hash.lastIndexOf(separator) + 1).length, 64);
+      expect(PinSecurity.needsUpgrade(hash), isFalse);
     });
 
     test('verify accepts the correct PIN and rejects a wrong one', () {
@@ -23,6 +34,14 @@ void main() {
       final saltB = PinSecurity.generateSalt();
       expect(saltA, isNot(saltB));
       expect(PinSecurity.hash('1234', saltA), isNot(PinSecurity.hash('1234', saltB)));
+    });
+
+    test('legacy salted SHA-256 PINs remain verifiable for safe migration', () {
+      const salt = '00112233445566778899aabbccddeeff';
+      final legacy = sha256.convert(utf8.encode(salt + ':1234')).toString();
+      expect(PinSecurity.verify('1234', legacy, salt), isTrue);
+      expect(PinSecurity.verify('4321', legacy, salt), isFalse);
+      expect(PinSecurity.needsUpgrade(legacy), isTrue);
     });
 
     test('format validation rejects empty, short, long and non-numeric PINs', () {
