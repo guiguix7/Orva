@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/database/orva_repository.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
+import '../security/security_settings_page.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -21,6 +22,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _loading = true;
   String _theme = 'light';
   bool _busy = false;
+  bool _quotesEnabled = true;
 
   @override
   void initState() { super.initState(); _load(); }
@@ -30,9 +32,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _load() async {
     try {
       final repo = ref.read(repositoryProvider);
-      final values = await Future.wait<String?>([repo.getSetting('user_name'), repo.getSetting('theme')]);
+      final values = await Future.wait<String?>([repo.getSetting('user_name'), repo.getSetting('theme'), repo.getSetting('quotes_enabled')]);
       if (!mounted) return;
-      setState(() { _name.text = values[0] ?? ''; _theme = values[1] ?? 'light'; _loading = false; });
+      setState(() { _name.text = values[0] ?? ''; _theme = values[1] ?? 'light'; _quotesEnabled = values[2] != '0'; _loading = false; });
     } catch (error) { if (mounted) { setState(() => _loading = false); showOrvaError(context, error); } }
   }
 
@@ -42,8 +44,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final repo = ref.read(repositoryProvider);
       await repo.setSetting('user_name', _name.text.trim());
       await repo.setSetting('theme', _theme);
+      await repo.setSetting('quotes_enabled', _quotesEnabled ? '1' : '0');
       ref.invalidate(themeNameProvider);
       ref.invalidate(userNameProvider);
+      ref.invalidate(quotesEnabledProvider);
       if (mounted) showOrvaMessage(context, 'Preferências salvas neste dispositivo.');
     } catch (error) { if (mounted) showOrvaError(context, error); }
     finally { if (mounted) setState(() => _busy = false); }
@@ -123,7 +127,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           RadioListTile<String>(value: 'dayNight', groupValue: _theme, title: const Text('Automático por horário'), subtitle: const Text('Claro das 07h às 19h e escuro à noite'), secondary: const Icon(Icons.nights_stay_outlined), onChanged: (value) => setState(() => _theme = value ?? 'dayNight'), contentPadding: EdgeInsets.zero),
         ])),
         const SizedBox(height: 14),
+        OrvaSurface(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2), child: SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Frases filosóficas'),
+          subtitle: const Text('Mostra uma reflexão diferente por dia na Home'),
+          value: _quotesEnabled,
+          onChanged: (value) => setState(() => _quotesEnabled = value),
+        )),
+        const SizedBox(height: 14),
         SizedBox(width: double.infinity, child: FilledButton(onPressed: _busy ? null : _saveProfile, child: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Salvar preferências'))),
+        const SizedBox(height: 30),
+        Text('Segurança', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 6),
+        Text('Bloqueio local com PIN ou biometria. Nenhum dado sai do dispositivo.', style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 14),
+        OrvaSurface(onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SecuritySettingsPage())), child: const Row(children: [
+          Icon(Icons.lock_outline_rounded, color: OrvaColors.primary),
+          SizedBox(width: 12),
+          Expanded(child: Text('Bloqueio do app')),
+          Icon(Icons.chevron_right_rounded, color: OrvaColors.tertiaryText),
+        ])),
         const SizedBox(height: 30),
         Text('Backup local', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 6),

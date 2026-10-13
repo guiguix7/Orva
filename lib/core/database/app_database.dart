@@ -20,7 +20,7 @@ final class AppDatabase extends GeneratedDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   Iterable<TableInfo<Table, Object>> get allTables => const <TableInfo<Table, Object>>[];
@@ -38,6 +38,11 @@ final class AppDatabase extends GeneratedDatabase {
         onUpgrade: (_, from, to) async {
           if (from < 2) {
             for (final statement in _routineTemplateSchema) {
+              await customStatement(statement);
+            }
+          }
+          if (from < 3) {
+            for (final statement in _weightEntrySchema) {
               await customStatement(statement);
             }
           }
@@ -198,6 +203,22 @@ final class AppDatabase extends GeneratedDatabase {
       updated_at TEXT NOT NULL
     )''',
     ..._routineTemplateSchema,
+    ..._weightEntrySchema,
+  ];
+
+  /// Datado histórico de peso. Cada registro é um ponto no tempo; medições
+  /// anteriores nunca são sobrescritas ao registrar um novo peso (ver
+  /// OrvaRepository.saveWeightEntry).
+  static const List<String> _weightEntrySchema = [
+    '''CREATE TABLE weight_entries (
+      id TEXT PRIMARY KEY NOT NULL,
+      measured_at TEXT NOT NULL,
+      weight_kg REAL NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      CHECK(weight_kg > 0)
+    )''',
+    'CREATE INDEX weight_entries_date_idx ON weight_entries(measured_at DESC)',
   ];
 
   static const List<String> _routineTemplateSchema = [

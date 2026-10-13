@@ -18,6 +18,8 @@ dependencies:
   file_picker: ^13.1.0
   share_plus: ^13.3.1
   device_preview: ^3.0.0
+  crypto: ^3.0.6
+  local_auth: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -28,3 +30,24 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Fontes de identidade visual do Orva (Fraunces/Inter/JetBrains Mono).
+  # Os arquivos .ttf não foram incluídos neste pacote — ver
+  # assets/fonts/README.md para instruções. Descomente depois de adicioná-los.
+  # fonts:
+  #   - family: Fraunces
+  #     fonts:
+  #       - asset: assets/fonts/Fraunces-Regular.ttf
+  #       - asset: assets/fonts/Fraunces-SemiBold.ttf
+  #         weight: 600
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #       - asset: assets/fonts/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Inter-SemiBold.ttf
+  #         weight: 600
+  #   - family: JetBrainsMono
+  #     fonts:
+  #       - asset: assets/fonts/JetBrainsMono-Regular.ttf
+  #       - asset: assets/fonts/JetBrainsMono-Medium.ttf
+  #         weight: 500

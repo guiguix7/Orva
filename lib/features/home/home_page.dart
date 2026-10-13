@@ -14,6 +14,7 @@ import '../hobbies/hobbies_page.dart';
 import '../journal/journal_page.dart';
 import '../notes/notes_page.dart';
 import '../routine/routine_page.dart';
+import '../quotes/quotes_data.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key, required this.onNavigate, required this.refreshSignal});
@@ -256,6 +257,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                               if (i < _hobbies.length - 1) const Divider(height: 22),
                             ],
                           ])),
+                        const SizedBox(height: 28),
+                        const _DailyQuoteCard(),
                       ],
                     ),
         ),
@@ -555,4 +558,27 @@ class _QuickActionTile extends StatelessWidget {
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: onTap,
       );
+}
+
+/// Reflexão do dia: frase filosófica determinística, discreta, desativável
+/// nas Configurações. Não depende de internet.
+class _DailyQuoteCard extends ConsumerWidget {
+  const _DailyQuoteCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(quotesEnabledProvider).asData?.value ?? true;
+    if (!enabled) return const SizedBox.shrink();
+    final quote = quoteOfTheDay(DateTime.now());
+    return OrvaSurface(
+      color: Theme.of(context).brightness == Brightness.dark ? OrvaColors.darkSubtle : OrvaColors.subtle,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Reflexão do dia', style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 8),
+        Text('"${quote.text}"', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontStyle: FontStyle.italic)),
+        const SizedBox(height: 6),
+        Text('— ${quote.author}', style: Theme.of(context).textTheme.bodySmall),
+      ]),
+    );
+  }
 }

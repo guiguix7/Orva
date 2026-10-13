@@ -125,3 +125,58 @@ flutter run
 ```
 
 Não foram inseridos dados pessoais fictícios.
+
+## Evolução incremental — entrega de 12/10/2026 (etapa 2)
+
+Esta revisão preserva o esquema SQLite e o backup das etapas anteriores,
+com uma migração aditiva (`schemaVersion` 2 → 3, tabela `weight_entries`
+nova, nenhuma tabela ou coluna existente alterada/removida).
+
+### Adicionado nesta etapa
+
+- **Perfil do usuário:** nome, data de nascimento (com cálculo de idade),
+  altura e gênero (opções inclusivas), tudo opcional, editável, guardado
+  localmente em `settings` — `lib/features/profile/profile_page.dart`.
+- **Histórico de peso e IMC:** tabela `weight_entries` nova; cada registro é
+  datado e peso anterior nunca é sobrescrito. IMC calculado apenas quando
+  peso+altura existem; para idade informada abaixo de 20 anos, o app não
+  classifica o IMC pelas faixas de adulto (não há percentis por idade/sexo
+  implementados).
+- **Bloqueio local (PIN + biometria opcional):** PIN nunca é salvo em texto
+  puro (hash SHA-256 salgado, `lib/core/security/pin_security.dart`); tela
+  de bloqueio real na abertura e ao retomar do segundo plano
+  (`lib/features/security/lock_screen.dart`); biometria via `local_auth`
+  com tratamento de indisponibilidade. Chaves de segurança são
+  explicitamente excluídas do backup JSON.
+- **Frases filosóficas:** biblioteca local de 30 citações com autoria
+  verificada, seleção determinística por data, ativável/desativável,
+  card discreto na Home — `lib/features/quotes/quotes_data.dart`.
+- **Tipografia:** `orva_theme.dart` agora referencia Fraunces/Inter/JetBrains
+  Mono com fallback seguro para fontes do sistema. Os arquivos `.ttf` não
+  foram incluídos (sem acesso à internet neste ambiente) — ver
+  `assets/fonts/README.md` para o passo manual de adicioná-los.
+- Testes novos em `test/security_and_profile_test.dart` (hashing de PIN,
+  frase determinística por data).
+
+### Ainda não implementado
+
+Login Google e sincronização com o Google Agenda (exigem credenciais OAuth
+reais e testes em dispositivo que este ambiente não permite), redesenho
+visual completo da agenda (grade horária, arrastar/redimensionar), módulo
+de alimentação/dieta, estatísticas históricas avançadas com `fl_chart`,
+tema automático por minuto exato em segundo plano (depende de testes em
+dispositivo real). Não trate nenhum desses como funcional.
+
+### Verificação
+
+Sem `flutter`/`dart` disponíveis neste ambiente, a verificação foi
+estática: todos os imports locais resolvem, chaves/parênteses de todos os
+arquivos em `lib/` batem, e os providers referenciados em `app.dart`
+existem onde são declarados. Isso **não substitui** rodar:
+
+```
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```

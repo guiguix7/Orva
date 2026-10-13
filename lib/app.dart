@@ -10,6 +10,7 @@ import 'features/checklists/checklists_page.dart';
 import 'features/goals/goals_page.dart';
 import 'features/home/home_page.dart';
 import 'features/more/more_page.dart';
+import 'features/security/lock_screen.dart';
 
 class OrvaApp extends ConsumerStatefulWidget {
   const OrvaApp({super.key});
@@ -21,6 +22,10 @@ class OrvaApp extends ConsumerStatefulWidget {
 class _OrvaAppState extends ConsumerState<OrvaApp> with WidgetsBindingObserver {
   Timer? _clock;
   DateTime _now = DateTime.now();
+  // Estado de desbloqueio da sessão atual. Começa travado; é liberado pela
+  // LockScreen (via PIN/biometria). Reaberturas e retomadas do segundo plano
+  // voltam a travar quando o bloqueio está ativo (ver didChangeAppLifecycleState).
+  bool _unlockedThisSession = false;
 
   @override
   void initState() {
@@ -35,6 +40,11 @@ class _OrvaAppState extends ConsumerState<OrvaApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() => _now = DateTime.now());
+    }
+    if (state == AppLifecycleState.paused && mounted) {
+      // Ao voltar do segundo plano, a tela de bloqueio reaparece se o
+      // bloqueio estiver ativo (checado de novo no build via lockEnabledProvider).
+      setState(() => _unlockedThisSession = false);
     }
   }
 
@@ -62,7 +72,15 @@ class _OrvaAppState extends ConsumerState<OrvaApp> with WidgetsBindingObserver {
       darkTheme: buildOrvaDarkTheme(),
       themeMode: themeMode,
       home: ready.when(
-        data: (_) => const MainShell(),
+        data: (_) => _unlockedThisSession
+            ? const MainShell()
+            : ref.watch(lockEnabledProvider).when(
+                  data: (lockEnabled) => lockEnabled
+                      ? LockScreen(onUnlocked: () => setState(() => _unlockedThisSession = true))
+                      : const MainShell(),
+                  loading: () => const _LoadingScreen(),
+                  error: (error, stack) => const MainShell(), // Falha ao ler a preferência de bloqueio não deve trancar o usuário fora do app.
+                ),
         loading: () => const _LoadingScreen(),
         error: (error, stack) => _StartupError(error: error),
       ),

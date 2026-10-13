@@ -32,6 +32,21 @@ abstract final class OrvaColors {
   static const darkPrimary = Color(0xFF7FB8B1);
 }
 
+/// Estilo para números/horários/contadores (ver seção 9 do prompt mestre).
+/// Usa JetBrains Mono quando os arquivos de fonte estiverem presentes (ver
+/// assets/fonts/README.md); cai graciosamente em uma fonte monoespaçada do
+/// sistema enquanto isso não acontece.
+TextStyle orvaMonoStyle({double fontSize = 16, FontWeight fontWeight = FontWeight.w600, Color? color, double? letterSpacing}) {
+  return TextStyle(
+    fontFamily: 'JetBrainsMono',
+    fontFamilyFallback: const ['Roboto Mono', 'Courier', 'monospace'],
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    color: color,
+    letterSpacing: letterSpacing,
+  );
+}
+
 ThemeData buildOrvaLightTheme() {
   final scheme = ColorScheme.fromSeed(
     seedColor: OrvaColors.primary,
@@ -43,6 +58,8 @@ ThemeData buildOrvaLightTheme() {
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
+    fontFamily: 'Inter',
+    fontFamilyFallback: const ['Roboto', 'sans-serif'],
     scaffoldBackgroundColor: OrvaColors.canvas,
     dividerColor: OrvaColors.border,
     splashFactory: InkSparkle.splashFactory,
@@ -91,8 +108,8 @@ ThemeData buildOrvaLightTheme() {
       ),
     ),
     textTheme: const TextTheme(
-      displaySmall: TextStyle(fontSize: 36, height: 1.12, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -1.2, fontFamily: 'serif'),
-      headlineMedium: TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -0.6, fontFamily: 'serif'),
+      displaySmall: TextStyle(fontSize: 36, height: 1.12, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -1.2, fontFamily: 'Fraunces', fontFamilyFallback: const ['Georgia', 'serif']),
+      headlineMedium: TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -0.6, fontFamily: 'Fraunces', fontFamilyFallback: const ['Georgia', 'serif']),
       titleLarge: TextStyle(fontSize: 22, height: 1.28, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -0.2),
       titleMedium: TextStyle(fontSize: 18, height: 1.35, fontWeight: FontWeight.w600, color: OrvaColors.text),
       bodyLarge: TextStyle(fontSize: 16, height: 1.5, color: OrvaColors.text),
@@ -126,6 +143,8 @@ ThemeData buildOrvaDarkTheme() {
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
+    fontFamily: 'Inter',
+    fontFamilyFallback: const ['Roboto', 'sans-serif'],
     scaffoldBackgroundColor: OrvaColors.darkCanvas,
     dividerColor: OrvaColors.darkBorder,
     appBarTheme: const AppBarTheme(backgroundColor: OrvaColors.darkCanvas, foregroundColor: OrvaColors.darkText, elevation: 0, surfaceTintColor: Colors.transparent),
@@ -145,8 +164,8 @@ ThemeData buildOrvaDarkTheme() {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: OrvaColors.darkPrimary, foregroundColor: OrvaColors.primary900, minimumSize: const Size(48, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
     textTheme: const TextTheme(
-      displaySmall: TextStyle(fontSize: 36, height: 1.12, fontWeight: FontWeight.w600, color: OrvaColors.darkText, letterSpacing: -1.2, fontFamily: 'serif'),
-      headlineMedium: TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w600, color: OrvaColors.darkText, letterSpacing: -0.6, fontFamily: 'serif'),
+      displaySmall: TextStyle(fontSize: 36, height: 1.12, fontWeight: FontWeight.w600, color: OrvaColors.darkText, letterSpacing: -1.2, fontFamily: 'Fraunces', fontFamilyFallback: const ['Georgia', 'serif']),
+      headlineMedium: TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w600, color: OrvaColors.darkText, letterSpacing: -0.6, fontFamily: 'Fraunces', fontFamilyFallback: const ['Georgia', 'serif']),
       titleLarge: TextStyle(fontSize: 22, height: 1.28, fontWeight: FontWeight.w600, color: OrvaColors.darkText),
       titleMedium: TextStyle(fontSize: 18, height: 1.35, fontWeight: FontWeight.w600, color: OrvaColors.darkText),
       bodyLarge: TextStyle(fontSize: 16, height: 1.5, color: OrvaColors.darkText),

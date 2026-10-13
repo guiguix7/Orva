@@ -599,9 +599,109 @@ final class OrvaRepository {
     };
   }
 
+  // ===========================================================================
+  // Perfil do usuário (local). Guardado como pares chave/valor na tabela
+  // settings existente — não exige migração de esquema própria. Datas são
+  // ISO 8601 (AAAA-MM-DD). Nenhum campo é obrigatório para o app funcionar.
+  // ===========================================================================
+  static const _profileKeys = <String>[
+    'profile_name',
+    'profile_birth_date',
+    'profile_height_cm',
+    'profile_gender',
+  ];
+
+  Future<Map<String, String?>> getProfile() async {
+    final values = await Future.wait(_profileKeys.map(getSetting));
+    return Map.fromIterables(_profileKeys, values);
+  }
+
+  Future<void> saveProfile({
+    String? name,
+    String? birthDateIso,
+    double? heightCm,
+    String? gender,
+  }) async {
+    await setSetting('profile_name', name?.trim() ?? '');
+    await setSetting('profile_birth_date', birthDateIso ?? '');
+    await setSetting('profile_height_cm', heightCm == null ? '' : heightCm.toString());
+    await setSetting('profile_gender', gender ?? '');
+  }
+
+  /// Idade em anos completos na data de referência (padrão: hoje). Retorna
+  /// null quando a data de nascimento não foi informada.
+  int? ageInYears(DateTime birthDate, [DateTime? reference]) {
+    final now = reference ?? DateTime.now();
+    var age = now.year - birthDate.year;
+    if (now.month < birthDate.month || (now.month == birthDate.month && now.day < birthDate.day)) {
+      age -= 1;
+    }
+    return age;
+  }
+
+  // ===========================================================================
+  // Histórico de peso. Cada chamada cria um novo registro datado; medições
+  // anteriores nunca são apagadas ou sobrescritas ao registrar um novo peso.
+  // ===========================================================================
+  Future<List<Map<String, Object?>>> getWeightEntries() =>
+      rows('SELECT * FROM weight_entries ORDER BY measured_at DESC, created_at DESC');
+
+  Future<void> saveWeightEntry({required DateTime measuredAt, required double weightKg, String note = ''}) async {
+    if (weightKg <= 0) throw ArgumentError('Informe um peso maior que zero.');
+    await execute(
+      'INSERT INTO weight_entries(id, measured_at, weight_kg, note, created_at) VALUES(?,?,?,?,?)',
+      [newId(), dateKey(measuredAt), weightKg, note.trim(), timestamp()],
+    );
+  }
+
+  Future<void> deleteWeightEntry(String id) => execute('DELETE FROM weight_entries WHERE id = ?', [id]);
+
+  /// IMC para adultos (kg / m²). O chamador deve evitar classificar o
+  /// resultado como diagnóstico e deve usar critérios diferentes (não
+  /// implementados aqui) para menores de 20 anos.
+  double bodyMassIndex({required double weightKg, required double heightCm}) {
+    final heightM = heightCm / 100;
+    if (heightM <= 0) throw ArgumentError('Altura inválida.');
+    return weightKg / (heightM * heightM);
+  }
+
+  // ===========================================================================
+  // Bloqueio local (PIN). O PIN nunca é guardado em texto puro: apenas um
+  // hash salgado (ver core/security/pin_security.dart). Chaves de segurança
+  // começam com "security_" e são deliberadamente excluídas do backup JSON
+  // (ver _backupTables/exportBackup/importBackup abaixo).
+  // ===========================================================================
+  Future<bool> isLockEnabled() async => (await getSetting('security_lock_enabled')) == '1';
+
+  Future<bool> hasPinConfigured() async => (await getSetting('security_pin_hash'))?.isNotEmpty == true;
+
+  Future<bool> isBiometricEnabled() async => (await getSetting('security_biometric_enabled')) == '1';
+
+  Future<void> setBiometricEnabled(bool enabled) => setSetting('security_biometric_enabled', enabled ? '1' : '0');
+
+  Future<void> setPin({required String pinHash, required String pinSalt}) async {
+    await setSetting('security_pin_hash', pinHash);
+    await setSetting('security_pin_salt', pinSalt);
+    await setSetting('security_lock_enabled', '1');
+  }
+
+  Future<void> disableLock() async {
+    await setSetting('security_lock_enabled', '0');
+    await setSetting('security_pin_hash', '');
+    await setSetting('security_pin_salt', '');
+    await setSetting('security_biometric_enabled', '0');
+  }
+
+  Future<({String hash, String salt})?> getPinHashAndSalt() async {
+    final hash = await getSetting('security_pin_hash');
+    final salt = await getSetting('security_pin_salt');
+    if (hash == null || salt == null || hash.isEmpty || salt.isEmpty) return null;
+    return (hash: hash, salt: salt);
+  }
+
   // Backup format is explicit and versioned. Import callers must confirm data
   // replacement with the user before calling importBackup.
-  static const backupVersion = 2;
+  static const backupVersion = 3;
   static const _backupTables = <String>[
     'categories',
     'goals',
@@ -617,13 +717,29 @@ final class OrvaRepository {
     'hobby_sessions',
     'notes',
     'journal_entries',
+    'weight_entries',
     'settings',
   ];
+
+  /// Chaves de settings nunca incluídas no backup: PIN e flags de segurança.
+  /// Perfil (nome, data de nascimento, altura, gênero) É incluído, pois são
+  /// dados pessoais e não segredos de autenticação.
+  static const _settingsKeysExcludedFromBackup = <String>{
+    'security_pin_hash',
+    'security_pin_salt',
+    'security_lock_enabled',
+    'security_biometric_enabled',
+  };
 
   Future<Map<String, Object?>> exportBackup() async {
     final data = <String, Object?>{};
     for (final table in _backupTables) {
-      data[table] = await rows('SELECT * FROM $table');
+      if (table == 'settings') {
+        final settingsRows = await rows('SELECT * FROM settings');
+        data[table] = settingsRows.where((row) => !_settingsKeysExcludedFromBackup.contains(row['setting_key'])).toList();
+      } else {
+        data[table] = await rows('SELECT * FROM $table');
+      }
     }
     return {
       'format': 'orva_backup',
@@ -662,6 +778,7 @@ final class OrvaRepository {
       'hobby_sessions': {'id','hobby_id','session_date','duration_minutes','start_minute','end_minute','note','created_at'},
       'notes': {'id','title','content','tags_json','created_at','updated_at'},
       'journal_entries': {'id','entry_date','content','mood','tags_json','created_at','updated_at'},
+      'weight_entries': {'id','measured_at','weight_kg','note','created_at'},
       'settings': {'setting_key','setting_value','updated_at'},
     };
 
@@ -689,15 +806,24 @@ final class OrvaRepository {
       await execute('PRAGMA defer_foreign_keys = ON');
       for (final table in [
         'checklist_occurrence_items','checklist_occurrences','checklist_items','checklists',
-        'goal_progress_history','routine_blocks','routine_template_blocks','routine_templates','hobby_sessions','hobbies','journal_entries','notes','goals','settings','categories',
+        'goal_progress_history','routine_blocks','routine_template_blocks','routine_templates','hobby_sessions','hobbies','journal_entries','weight_entries','notes','goals','categories',
       ]) {
         await execute('DELETE FROM $table');
       }
+      // Preserva PIN e preferências de bloqueio existentes: o backup nunca
+      // contém essas chaves, e importar não deve desativar a proteção local.
+      await execute(
+        'DELETE FROM settings WHERE setting_key NOT IN (${_settingsKeysExcludedFromBackup.map((_) => '?').join(',')})',
+        _settingsKeysExcludedFromBackup.toList(),
+      );
       for (final table in _backupTables) {
         final tableRows = rawData[table] as List<dynamic>;
         for (final raw in tableRows) {
           final record = Map<String, dynamic>.from(raw as Map<String, dynamic>);
           if (record.isEmpty) continue;
+          if (table == 'settings' && _settingsKeysExcludedFromBackup.contains(record['setting_key'])) {
+            continue; // defesa extra: nunca aceitar PIN/flags de segurança vindos de um arquivo de backup.
+          }
           final columns = record.keys.toList();
           final marks = List.filled(columns.length, '?').join(',');
           await execute('INSERT INTO $table (${columns.join(',')}) VALUES ($marks)', columns.map((key) => record[key]).toList());
@@ -716,4 +842,17 @@ final themeNameProvider = FutureProvider<String>((ref) async {
 final userNameProvider = FutureProvider<String?>((ref) async {
   final value = await ref.watch(repositoryProvider).getSetting('user_name');
   return value == null || value.trim().isEmpty ? null : value.trim();
+});
+
+final lockEnabledProvider = FutureProvider<bool>((ref) async {
+  return ref.watch(repositoryProvider).isLockEnabled();
+});
+
+final biometricEnabledProvider = FutureProvider<bool>((ref) async {
+  return ref.watch(repositoryProvider).isBiometricEnabled();
+});
+
+final quotesEnabledProvider = FutureProvider<bool>((ref) async {
+  final value = await ref.watch(repositoryProvider).getSetting('quotes_enabled');
+  return value != '0'; // ativado por padrão
 });
