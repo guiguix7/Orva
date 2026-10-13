@@ -25,6 +25,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
   void dispose() { _search.dispose(); super.dispose(); }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     try {
       final notes = await ref.read(repositoryProvider).getNotes(search: _search.text);
@@ -47,7 +48,25 @@ class _NotesPageState extends ConsumerState<NotesPage> {
           final content = (note['content'] as String?) ?? '';
           final tags = _readTags(note['tags_json']);
           return OrvaSurface(onTap: () async { await showNoteEditor(context, ref, note: note); await _load(); }, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [Expanded(child: Text((note['title'] as String?)?.isNotEmpty == true ? note['title'] as String : 'Nota sem título', style: Theme.of(context).textTheme.titleMedium)), PopupMenuButton<String>(onSelected: (choice) async { if (choice == 'edit') { await showNoteEditor(context, ref, note: note); await _load(); } if (choice == 'delete') { final ok = await confirmAction(context, title: 'Excluir nota?', message: 'Esta nota será removida permanentemente deste dispositivo.', actionLabel: 'Excluir', destructive: true); if (ok) { await ref.read(repositoryProvider).deleteNote(note['id'] as String); await _load(); } } }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Editar')), PopupMenuItem(value: 'delete', child: Text('Excluir'))])]),
+            Row(children: [Expanded(child: Text((note['title'] as String?)?.isNotEmpty == true ? note['title'] as String : 'Nota sem título', style: Theme.of(context).textTheme.titleMedium)), PopupMenuButton<String>(onSelected: (choice) async {
+              if (choice == 'edit') {
+                await showNoteEditor(context, ref, note: note);
+                if (!mounted) return;
+                await _load();
+              } else if (choice == 'delete') {
+                final ok = await confirmAction(
+                  context,
+                  title: 'Excluir nota?',
+                  message: 'Esta nota será removida permanentemente deste dispositivo.',
+                  actionLabel: 'Excluir',
+                  destructive: true,
+                );
+                if (!mounted || !ok) return;
+                await ref.read(repositoryProvider).deleteNote(note['id'] as String);
+                if (!mounted) return;
+                await _load();
+              }
+            }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Editar')), PopupMenuItem(value: 'delete', child: Text('Excluir'))])]),
             if (content.isNotEmpty) ...[const SizedBox(height: 7), Text(content, maxLines: 3, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium)],
             if (tags.isNotEmpty) ...[const SizedBox(height: 12), Wrap(spacing: 6, runSpacing: 6, children: tags.map((tag) => _Tag(label: tag)).toList())],
             const SizedBox(height: 12),
