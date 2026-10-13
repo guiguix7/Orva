@@ -9,14 +9,14 @@ void main() {
 
     test('sanitizes credential values and email addresses', () {
       final result = OrvaDiagnostics.sanitize(
-        'access_token=abc123 Bearer eyJhbGci.user.signature user@example.com PIN: 1234',
+        'access_token=abc123 Bearer eyJhbGci.user.signature authorization: Bearer topsecret user@example.com PIN: 1234',
       );
 
       expect(result, contains('access_token=[redigido]'));
       expect(result, contains('Bearer [redigido]'));
       expect(result, contains('[e-mail]'));
       expect(result, contains('PIN: [redigido]'));
-      expect(result, isNot(contains('abc123')));
+      expect(result, isNot(contains('abc123')));\n      expect(result, isNot(contains('topsecret')));
       expect(result, isNot(contains('user@example.com')));
     });
 
