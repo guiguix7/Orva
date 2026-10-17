@@ -108,8 +108,8 @@ ThemeData buildOrvaLightTheme() {
       ),
     ),
     textTheme: const TextTheme(
-      displaySmall: TextStyle(fontSize: 36, height: 1.12, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -1.2, fontFamily: 'Fraunces', fontFamilyFallback: const ['Georgia', 'serif']),
-      headlineMedium: TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -0.6, fontFamily: 'Fraunces', fontFamilyFallback: const ['Georgia', 'serif']),
+      displaySmall: TextStyle(fontSize: 36, height: 1.12, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -1.2, fontFamily: 'Fraunces', fontFamilyFallback: ['Georgia', 'serif']),
+      headlineMedium: TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -0.6, fontFamily: 'Fraunces', fontFamilyFallback: ['Georgia', 'serif']),
       titleLarge: TextStyle(fontSize: 22, height: 1.28, fontWeight: FontWeight.w600, color: OrvaColors.text, letterSpacing: -0.2),
       titleMedium: TextStyle(fontSize: 18, height: 1.35, fontWeight: FontWeight.w600, color: OrvaColors.text),
       bodyLarge: TextStyle(fontSize: 16, height: 1.5, color: OrvaColors.text),
@@ -164,8 +164,8 @@ ThemeData buildOrvaDarkTheme() {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: OrvaColors.darkPrimary, foregroundColor: OrvaColors.primary900, minimumSize: const Size(48, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
     textTheme: const TextTheme(
-      displaySmall: TextStyle(fontSize: 36, height: 1.12, fontWeight: FontWeight.w600, color: OrvaColors.darkText, letterSpacing: -1.2, fontFamily: 'Fraunces', fontFamilyFallback: const ['Georgia', 'serif']),
-      headlineMedium: TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w600, color: OrvaColors.darkText, letterSpacing: -0.6, fontFamily: 'Fraunces', fontFamilyFallback: const ['Georgia', 'serif']),
+      displaySmall: TextStyle(fontSize: 36, height: 1.12, fontWeight: FontWeight.w600, color: OrvaColors.darkText, letterSpacing: -1.2, fontFamily: 'Fraunces', fontFamilyFallback: ['Georgia', 'serif']),
+      headlineMedium: TextStyle(fontSize: 28, height: 1.2, fontWeight: FontWeight.w600, color: OrvaColors.darkText, letterSpacing: -0.6, fontFamily: 'Fraunces', fontFamilyFallback: ['Georgia', 'serif']),
       titleLarge: TextStyle(fontSize: 22, height: 1.28, fontWeight: FontWeight.w600, color: OrvaColors.darkText),
       titleMedium: TextStyle(fontSize: 18, height: 1.35, fontWeight: FontWeight.w600, color: OrvaColors.darkText),
       bodyLarge: TextStyle(fontSize: 16, height: 1.5, color: OrvaColors.darkText),

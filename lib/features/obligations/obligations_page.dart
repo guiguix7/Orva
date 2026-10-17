@@ -106,7 +106,7 @@ class _ObligationsPageState extends ConsumerState<ObligationsPage> {
           TextField(controller: category, maxLength: 80, decoration: const InputDecoration(labelText: 'Categoria')),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: recurrence,
+            initialValue: recurrence,
             decoration: const InputDecoration(labelText: 'Recorrência'),
             items: const [
               DropdownMenuItem(value: 'once', child: Text('Uma vez')),
@@ -167,7 +167,7 @@ class _ObligationsPageState extends ConsumerState<ObligationsPage> {
             Align(alignment: Alignment.centerLeft, child: Text('Este intervalo atravessa a meia-noite. A ocorrência fica vinculada à data em que começa.', style: Theme.of(context).textTheme.bodySmall)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: priority,
+            initialValue: priority,
             decoration: const InputDecoration(labelText: 'Prioridade'),
             items: const [
               DropdownMenuItem(value: 'low', child: Text('Baixa')),
@@ -313,7 +313,7 @@ class _ObligationsPageState extends ConsumerState<ObligationsPage> {
           : ListView.separated(
               shrinkWrap: true,
               itemCount: history.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (_, index) {
                 final occurrence = history[index];
                 final status = occurrence['status'] as String;

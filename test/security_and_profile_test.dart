@@ -14,7 +14,7 @@ void main() {
       expect(hash, isNot('1234'));
       expect(
         hash.startsWith(
-          'pbkdf2-sha256' + separator + PinSecurity.iterations.toString() + separator,
+          'pbkdf2-sha256$separator${PinSecurity.iterations}$separator',
         ),
         isTrue,
       );
@@ -38,7 +38,7 @@ void main() {
 
     test('legacy salted SHA-256 PINs remain verifiable for safe migration', () {
       const salt = '00112233445566778899aabbccddeeff';
-      final legacy = sha256.convert(utf8.encode(salt + ':1234')).toString();
+      final legacy = sha256.convert(utf8.encode('$salt:1234')).toString();
       expect(PinSecurity.verify('1234', legacy, salt), isTrue);
       expect(PinSecurity.verify('4321', legacy, salt), isFalse);
       expect(PinSecurity.needsUpgrade(legacy), isTrue);

@@ -71,7 +71,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
           TextField(controller: description, maxLines: 3, decoration: const InputDecoration(labelText: 'Descrição')),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: goalId,
+            initialValue: goalId,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Meta relacionada (opcional)'),
             items: [
@@ -123,7 +123,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
           TextField(controller: description, maxLines: 2, decoration: const InputDecoration(labelText: 'Descrição/observações')),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: parentId,
+            initialValue: parentId,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Assunto pai'),
             items: [
@@ -137,7 +137,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: status,
+            initialValue: status,
             decoration: const InputDecoration(labelText: 'Estado'),
             items: const [
               DropdownMenuItem(value: 'not_started', child: Text('Não iniciado')),
@@ -204,7 +204,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         title: Text(session == null ? 'Registrar sessão de estudo' : 'Editar sessão de estudo'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           DropdownButtonFormField<String>(
-            value: subjectId,
+            initialValue: subjectId,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Matéria *'),
             items: subjects.map((s) => DropdownMenuItem(value: s['id'] as String, child: Text('${s['name']}', overflow: TextOverflow.ellipsis))).toList(),
@@ -216,7 +216,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: topicId,
+            initialValue: topicId,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Assunto (opcional)'),
             items: [
@@ -227,7 +227,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: goalId,
+            initialValue: goalId,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Meta (opcional)'),
             items: [
@@ -414,7 +414,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
         title: Text('Revisar: ${topic['name']}'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           DropdownButtonFormField<String>(
-            value: kind,
+            initialValue: kind,
             decoration: const InputDecoration(labelText: 'Tipo de revisão'),
             items: const [
               DropdownMenuItem(value: 'review', child: Text('Revisão')),
@@ -425,7 +425,7 @@ class _StudyPageState extends ConsumerState<StudyPage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<int>(
-            value: confidence,
+            initialValue: confidence,
             decoration: const InputDecoration(labelText: 'Confiança (1 a 5)'),
             items: const [
               DropdownMenuItem(value: 1, child: Text('1 · Preciso revisar bastante')),

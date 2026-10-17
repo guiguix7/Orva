@@ -24,7 +24,7 @@ class OrvaDiagnosticEvent {
   String toExportLine() {
     final head = '${timestamp.toIso8601String()} | ${severity.name.toUpperCase()} | $category | $module | $id';
     final details = message + (stackTrace == null ? '' : '\n$stackTrace');
-    return head + '\n' + details;
+    return '$head\n$details';
   }
 }
 
@@ -65,7 +65,7 @@ class OrvaDiagnostics extends ChangeNotifier {
     if (!kDebugMode) return;
 
     final now = DateTime.now();
-    final id = now.microsecondsSinceEpoch.toString() + '-' + (++_sequence).toString();
+    final id = '${now.microsecondsSinceEpoch}-${++_sequence}';
     _events.add(OrvaDiagnosticEvent(
       id: id,
       timestamp: now,
@@ -94,7 +94,7 @@ class OrvaDiagnostics extends ChangeNotifier {
       module: module,
       // Arbitrary exception text may contain diary, health, task or account data.
       // Keep the exception class and stack location, not user-controlled details.
-      message: error.runtimeType.toString() + ': detalhes omitidos para proteger dados pessoais',
+      message: '${error.runtimeType}: detalhes omitidos para proteger dados pessoais',
       stackTrace: stackTrace,
     );
   }
@@ -113,11 +113,11 @@ class OrvaDiagnostics extends ChangeNotifier {
     var sanitized = value.replaceAll(_bearerPattern, 'Bearer [redigido]');
     sanitized = sanitized.replaceAllMapped(
       _credentialPattern,
-      (match) => (match.group(1) ?? '') + '[redigido]',
+      (match) => '${match.group(1) ?? ''}[redigido]',
     );
     sanitized = sanitized.replaceAll(_emailPattern, '[e-mail]');
     if (sanitized.length > 4000) {
-      sanitized = sanitized.substring(0, 4000) + '…';
+      sanitized = '${sanitized.substring(0, 4000)}…';
     }
     return sanitized;
   }

@@ -123,7 +123,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
               Expanded(child: TextField(controller: reference, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Referência *'))),
               const SizedBox(width: 10),
               Expanded(child: DropdownButtonFormField<String>(
-                value: unit.text,
+                initialValue: unit.text,
                 decoration: const InputDecoration(labelText: 'Unidade'),
                 items: const [
                   DropdownMenuItem(value: 'g', child: Text('g')),
@@ -226,14 +226,14 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
           TextField(controller: title, autofocus: true, maxLength: 120, decoration: const InputDecoration(labelText: 'Nome da refeição *')),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: mealType,
+            initialValue: mealType,
             decoration: const InputDecoration(labelText: 'Tipo'),
             items: _mealTypes.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
             onChanged: (v) => setDialog(() => mealType = v ?? 'custom'),
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: recurrence,
+            initialValue: recurrence,
             decoration: const InputDecoration(labelText: 'Repetição'),
             items: const [
               DropdownMenuItem(value: 'once', child: Text('Uma data')),
@@ -363,7 +363,7 @@ class _NutritionPageState extends ConsumerState<NutritionPage> {
         title: Text('Adicionar alimento ao plano'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           DropdownButtonFormField<String>(
-            value: foodId,
+            initialValue: foodId,
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Alimento'),
             items: _foods.map((f) => DropdownMenuItem(value: f['id'] as String, child: Text('${f['name']}', overflow: TextOverflow.ellipsis))).toList(),
@@ -832,7 +832,7 @@ class _NutritionSummary extends StatelessWidget {
       const SizedBox(height:16),
       Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text(kcal is num?'${kcal.toStringAsFixed(kcal % 1 == 0 ? 0 : 1)}':'—',style:Theme.of(context).textTheme.headlineMedium?.copyWith(color:OrvaColors.primary)),
+          Text(kcal is num?kcal.toStringAsFixed(kcal % 1 == 0 ? 0 : 1):'—',style:Theme.of(context).textTheme.headlineMedium?.copyWith(color:OrvaColors.primary)),
           Text('kcal conhecidas',style:Theme.of(context).textTheme.bodySmall),
         ])),
         Expanded(child:_SmallNutrient(label:'Proteína',value:nutrient('protein_g',' g'))),
@@ -1003,7 +1003,7 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
         TextField(controller:_title,autofocus:true,maxLength:120,decoration:const InputDecoration(labelText:'Nome da refeição *')),
         const SizedBox(height:8),
         DropdownButtonFormField<String>(
-          value:_mealType,
+          initialValue:_mealType,
           decoration:const InputDecoration(labelText:'Tipo'),
           items:_mealTypes.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),
           onChanged:(v)=>setState(()=>_mealType=v??'custom'),
@@ -1042,7 +1042,7 @@ class _FoodConsumptionDialogState extends State<_FoodConsumptionDialog> {
           const Align(alignment:Alignment.centerLeft,child:Text('O catálogo está vazio. Você ainda pode registrar a refeição por nome e observações.'))
         else ...[
           DropdownButtonFormField<String>(
-            value:_foodId,
+            initialValue:_foodId,
             isExpanded:true,
             decoration:const InputDecoration(labelText:'Alimento cadastrado'),
             items:widget.foods.map((f)=>DropdownMenuItem(value:f['id'] as String,child:Text('${f['name']} · por ${f['reference_amount']} ${f['reference_unit']}',overflow:TextOverflow.ellipsis))).toList(),

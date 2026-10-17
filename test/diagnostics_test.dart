@@ -28,7 +28,7 @@ void main() {
           severity: DiagnosticSeverity.info,
           category: 'test',
           module: 'unit',
-          message: 'message ' + index.toString(),
+          message: 'message $index',
         );
       }
 

@@ -168,7 +168,7 @@ class _DeveloperConsolePageState extends State<DeveloperConsolePage> {
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                           itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             final event = filtered[index];
                             final color = _colorFor(event.severity, context);
