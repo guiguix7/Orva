@@ -53,10 +53,10 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCfJhAV1rmE4vJg7vvH_Ec7udEZVm8wFMk',
-    appId: '1:273385324967:android:0a05b240f056c4a3ae7682',
-    messagingSenderId: '273385324967',
-    projectId: 'orva-8a92b',
-    storageBucket: 'orva-8a92b.firebasestorage.app',
+    apiKey: const String.fromEnvironment('FIREBASE_API_KEY'),
+    appId: const String.fromEnvironment('FIREBASE_APP_ID'),
+    messagingSenderId: const String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+    projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    storageBucket: const String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
   );
 }
