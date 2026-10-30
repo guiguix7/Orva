@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/database/orva_repository.dart';
 import '../../core/database/habits_repository.dart';
-import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 
 class HabitsPage extends ConsumerStatefulWidget {

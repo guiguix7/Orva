@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 
 import '../../core/database/orva_repository.dart';
 import '../../core/database/executions_repository.dart';
-import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
 
 class ExecutionsPage extends ConsumerStatefulWidget {
