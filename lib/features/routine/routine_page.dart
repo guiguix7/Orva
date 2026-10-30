@@ -10,6 +10,8 @@ import '../obligations/obligations_page.dart';
 import '../nutrition/nutrition_page.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/widgets/orva_widgets.dart';
+import '../../core/widgets/orva_pie_chart.dart';
+import '../../core/database/executions_repository.dart';
 
 class RoutinePage extends ConsumerStatefulWidget {
   const RoutinePage({super.key});
@@ -21,6 +23,8 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
   DateTime _selectedDate = DateTime.now();
   bool _loading = true;
   List<Map<String, Object?>> _blocks = [];
+  bool _showRealized = false;
+  Map<String, int> _realizedCategories = {};
 
   @override
   void initState() { super.initState(); _load(); }
@@ -33,6 +37,7 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
         repo.getRoutineForDate(_selectedDate),
         repo.getObligationTimeBlocksForDate(_selectedDate),
         repo.getMealPlanTimeBlocksForDate(_selectedDate),
+        repo.executionMinutesByCategory(from: _selectedDate, to: _selectedDate),
       ]);
       final blocks = <Map<String, Object?>>[
         ...(values[0] as List<Map<String, Object?>>),
@@ -40,7 +45,11 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
         ...(values[2] as List<Map<String, Object?>>),
       ]..sort((a, b) => intValue(a['start_minute']).compareTo(intValue(b['start_minute'])));
       if (!mounted) return;
-      setState(() { _blocks = blocks; _loading = false; });
+      setState(() {
+        _blocks = blocks;
+        _realizedCategories = values[3] as Map<String, int>;
+        _loading = false;
+      });
     } catch (error) { if (mounted) { setState(() => _loading = false); showOrvaError(context, error); } }
   }
 
@@ -143,6 +152,46 @@ class _RoutinePageState extends ConsumerState<RoutinePage> {
                     }),
                   const SizedBox(height: 10),
                 ],
+                const SizedBox(height: 20),
+                OrvaSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Expanded(child: Text('Distribuição do dia', style: Theme.of(context).textTheme.titleMedium)),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(value: false, label: Text('Planejado')),
+                        ButtonSegment(value: true, label: Text('Realizado')),
+                      ],
+                      selected: {_showRealized},
+                      onSelectionChanged: (s) => setState(() => _showRealized = s.first),
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    OrvaPieChart(
+                      slices: _showRealized
+                          ? _realizedCategories.entries.map((e) => OrvaPieSlice(label: e.key, value: e.value.toDouble(), color: OrvaColors.information)).toList()
+                          : categoryTotals.entries.map((e) => OrvaPieSlice(label: e.key, value: e.value.toDouble(), color: OrvaColors.information)).toList(),
+                      centerLabel: _showRealized
+                          ? formatMinutes(_realizedCategories.values.fold<int>(0, (a, b) => a + b))
+                          : formatMinutes(totalMinutes),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: (_showRealized ? _realizedCategories : categoryTotals).entries.map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(children: [
+                          Container(width: 10, height: 10, decoration: BoxDecoration(color: OrvaColors.information, borderRadius: BorderRadius.circular(5))),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(e.key, style: Theme.of(context).textTheme.bodySmall)),
+                          Text(formatMinutes(e.value), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                        ]),
+                      )).toList(),
+                    )),
+                  ]),
+                  if (_showRealized && _realizedCategories.isEmpty)
+                    Padding(padding: const EdgeInsets.only(top: 8), child: Text('Sem registros de execução para este dia.', style: Theme.of(context).textTheme.bodySmall)),
+                ])),
                 const SizedBox(height: 20),
                 OrvaSectionHeader(title: 'Distribuição por categoria'),
                 const SizedBox(height: 6),
