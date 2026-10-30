@@ -2,6 +2,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orva/core/database/app_database.dart';
 import 'package:orva/core/database/orva_repository.dart';
+import 'package:orva/core/database/executions_repository.dart';
+import 'package:orva/core/database/habits_repository.dart';
+import 'package:orva/core/database/countdowns_repository.dart';
 import 'package:orva/core/database/study_repository.dart';
 import 'package:orva/core/database/nutrition_repository.dart';
 import 'package:orva/core/database/obligations_repository.dart';
@@ -280,6 +283,7 @@ void main() {
       'study_subjects','study_topics','study_sessions','study_reviews',
       'foods','meal_plans','meal_plan_items','food_consumptions','food_consumption_items',
       'obligation_rules','obligation_exceptions','obligation_occurrences',
+      'executions','habits','habit_logs','countdowns',
     ];
     for (final table in newTables) {
       data.remove(table);
@@ -445,5 +449,36 @@ void main() {
       ),
       throwsArgumentError,
     );
+  });
+
+  test('executions, habits and countdowns persist and aggregate', () async {
+    final now = DateTime(2026, 10, 13, 10, 0);
+    await repository.saveExecution(
+      title: 'Estudo realizado',
+      category: 'Estudos',
+      durationMinutes: 45,
+      startedAt: now,
+      source: 'timer',
+      referenceDate: now,
+    );
+    expect((await repository.getExecutions()).length, 1);
+    expect(await repository.executionMinutesForDate(now, category: 'Estudos'), 45);
+    final byCategory = await repository.executionMinutesByCategory(from: now, to: now);
+    expect(byCategory['Estudos'], 45);
+
+    await repository.saveHabit(name: 'Água', unit: 'copos', targetValue: 8, category: 'Saúde');
+    final habit = (await repository.getHabits()).single;
+    await repository.logHabit(habitId: habit['id'] as String, date: now, quantity: 3);
+    await repository.logHabit(habitId: habit['id'] as String, date: now, quantity: 5);
+    expect(await repository.habitTotal(habit['id'] as String, from: now, to: now), 5);
+    final logs = await repository.getHabitLogs(habit['id'] as String);
+    expect(logs.single['quantity'], 5);
+
+    await repository.saveCountdown(title: 'Prova', targetDate: DateTime(2026, 12, 1), category: 'Estudos');
+    final countdown = (await repository.getCountdowns()).single;
+    expect(countdown['title'], 'Prova');
+    expect(repository.countdownDaysRemaining(DateTime(2026, 12, 1), now: now), 49);
+    await repository.deleteCountdown(countdown['id'] as String);
+    expect(await repository.getCountdowns(), isEmpty);
   });
 }

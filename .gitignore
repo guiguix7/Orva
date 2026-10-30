@@ -65,3 +65,7 @@ app.*.map.json
 /android/local.properties
 /ios/Flutter/Generated.xcconfig
 /ios/Flutter/flutter_export_environment.sh
+
+#others
+AGENTS.md
+ETAPA_3_RELATORIO_FINAL.md

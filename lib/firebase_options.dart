@@ -17,11 +17,13 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static const _apiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const _appId = String.fromEnvironment('FIREBASE_APP_ID');
-  static const _messagingSenderId =
-      String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+  static const _messagingSenderId = String.fromEnvironment(
+    'FIREBASE_MESSAGING_SENDER_ID',
+  );
   static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
-  static const _storageBucket =
-      String.fromEnvironment('FIREBASE_STORAGE_BUCKET');
+  static const _storageBucket = String.fromEnvironment(
+    'FIREBASE_STORAGE_BUCKET',
+  );
 
   static FirebaseOptions get currentPlatform {
     if (_apiKey.isEmpty || _appId.isEmpty || _projectId.isEmpty) {

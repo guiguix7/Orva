@@ -796,7 +796,7 @@ final class OrvaRepository {
 
   // Backup format is explicit and versioned. Import callers must confirm data
   // replacement with the user before calling importBackup.
-  static const backupVersion = 4;
+  static const backupVersion = 5;
   static const _legacyBackupTablesV3 = <String>{
     'categories','goals','goal_progress_history','checklists','checklist_items',
     'checklist_occurrences','checklist_occurrence_items','routine_blocks','hobbies',
@@ -831,6 +831,10 @@ final class OrvaRepository {
     'obligation_rules',
     'obligation_exceptions',
     'obligation_occurrences',
+    'executions',
+    'habits',
+    'habit_logs',
+    'countdowns',
     'settings',
   ];
 
@@ -868,21 +872,29 @@ final class OrvaRepository {
     if (decoded is! Map<String, dynamic> || decoded['format'] != 'orva_backup') {
       throw const FormatException('Este arquivo não é um backup válido do Orva.');
     }
-    // v3 backups are upgraded in memory, adding empty collections for the
+    // Older backups are upgraded in memory, adding empty collections for the
     // newly introduced modules. Existing records are kept unchanged.
-    if (decoded['version'] == 3) {
+    final version = decoded['version'];
+    if (version == 3 || version == 4) {
       final oldData = decoded['data'];
+      final expectedKeys = version == 3 ? _legacyBackupTablesV3 : _backupTables.toSet().difference(const {
+        'executions', 'habits', 'habit_logs', 'countdowns',
+      });
       if (oldData is! Map<String, dynamic> ||
-          oldData.keys.toSet().length != _legacyBackupTablesV3.length ||
-          !oldData.keys.toSet().containsAll(_legacyBackupTablesV3)) {
-        throw const FormatException('A estrutura do backup v3 é incompatível.');
+          oldData.keys.toSet().length != expectedKeys.length ||
+          !oldData.keys.toSet().containsAll(expectedKeys)) {
+        throw FormatException('A estrutura do backup v$version é incompatível.');
       }
       final upgradedData = Map<String, dynamic>.from(oldData);
-      for (final table in const [
-        'study_subjects','study_topics','study_sessions','study_reviews',
-        'foods','meal_plans','meal_plan_items','food_consumptions','food_consumption_items',
-        'obligation_rules','obligation_exceptions','obligation_occurrences',
-      ]) {
+      final missingTables = version == 3
+          ? const [
+              'study_subjects','study_topics','study_sessions','study_reviews',
+              'foods','meal_plans','meal_plan_items','food_consumptions','food_consumption_items',
+              'obligation_rules','obligation_exceptions','obligation_occurrences',
+              'executions','habits','habit_logs','countdowns',
+            ]
+          : const ['executions', 'habits', 'habit_logs', 'countdowns'];
+      for (final table in missingTables) {
         upgradedData[table] = <dynamic>[];
       }
       decoded = <String, dynamic>{
@@ -929,6 +941,10 @@ final class OrvaRepository {
       'obligation_rules': {'id','name','category','start_minute','end_minute','recurrence','weekdays_json','start_date','end_date','priority','is_active','created_at','updated_at'},
       'obligation_exceptions': {'id','rule_id','occurrence_date','action','override_name','override_category','override_start_minute','override_end_minute','note','created_at','updated_at'},
       'obligation_occurrences': {'id','rule_id','occurrence_date','name_snapshot','category_snapshot','start_minute','end_minute','ends_next_day','status','note_snapshot','created_at','updated_at'},
+      'executions': {'id','reference_type','reference_id','category','title','started_at','ended_at','duration_minutes','source','reference_date','note','created_at'},
+      'habits': {'id','name','unit','target_value','category','active_days_json','is_active','created_at','updated_at'},
+      'habit_logs': {'id','habit_id','log_date','quantity','note','created_at','updated_at'},
+      'countdowns': {'id','title','target_date','category','description','is_archived','created_at','updated_at'},
       'settings': {'setting_key','setting_value','updated_at'},
     };
 
@@ -961,6 +977,7 @@ final class OrvaRepository {
         'checklist_occurrence_items','checklist_occurrences','checklist_items','checklists',
         'goal_progress_history','routine_blocks','routine_template_blocks','routine_templates',
         'hobby_sessions','hobbies','journal_entries','weight_entries','notes','goals','categories',
+        'executions','habit_logs','habits','countdowns',
       ]) {
         await execute('DELETE FROM $table');
       }

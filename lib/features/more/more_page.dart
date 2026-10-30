@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/orva_theme.dart';
 import '../hobbies/hobbies_page.dart';
+import '../habits/habits_page.dart';
+import '../countdowns/countdowns_page.dart';
+import '../executions/executions_page.dart';
 import '../journal/journal_page.dart';
 import '../notes/notes_page.dart';
 import '../routine/routine_page.dart';
@@ -33,6 +36,12 @@ class MorePage extends StatelessWidget {
     _ModuleTile(icon: Icons.restaurant_outlined, title: 'Alimentação e saúde', subtitle: 'Catálogo de alimentos, refeições planejadas e consumo registrado.', tint: OrvaColors.terracotta, onTap: () => _open(context, const NutritionPage())),
     const SizedBox(height: 10),
     _ModuleTile(icon: Icons.sports_esports_outlined, title: 'Hobbies', subtitle: 'Registre sessões e acompanhe metas semanais.', tint: OrvaColors.terracotta, onTap: () => _open(context, const HobbiesPage())),
+    const SizedBox(height: 10),
+    _ModuleTile(icon: Icons.track_changes_outlined, title: 'Hábitos', subtitle: 'Hábitos quantitativos com unidades personalizadas.', tint: OrvaColors.mustard, onTap: () => _open(context, const HabitsPage())),
+    const SizedBox(height: 10),
+    _ModuleTile(icon: Icons.timer_outlined, title: 'Execuções reais', subtitle: 'Cronômetro, Pomodoro e tempo realmente realizado.', tint: OrvaColors.terracotta, onTap: () => _open(context, const ExecutionsPage())),
+    const SizedBox(height: 10),
+    _ModuleTile(icon: Icons.event_outlined, title: 'Contagens regressivas', subtitle: 'Datas importantes e dias restantes.', tint: OrvaColors.information, onTap: () => _open(context, const CountdownsPage())),
     const SizedBox(height: 10),
     _ModuleTile(icon: Icons.edit_note_outlined, title: 'Notas', subtitle: 'Pesquise e organize ideias e aprendizados.', tint: const Color(0xFF7A9B76), onTap: () => _open(context, const NotesPage())),
     const SizedBox(height: 10),

@@ -39,4 +39,16 @@ void main() {
     expect(isNightTheme(DateTime(2026, 10, 12, 18, 59)), false);
     expect(isNightTheme(DateTime(2026, 10, 12, 19)), true);
   });
+
+  test('overnight intervals split at midnight without duplicating duration', () {
+    expect(splitDailyInterval(1350, 450), [
+      (dayOffset: 0, startMinute: 1350, endMinute: 1440),
+      (dayOffset: 1, startMinute: 0, endMinute: 450),
+    ]);
+    expect(splitDailyInterval(600, 720), [
+      (dayOffset: 0, startMinute: 600, endMinute: 720),
+    ]);
+    final parts = splitDailyInterval(1350, 450);
+    expect(parts.fold<int>(0, (sum, part) => sum + (part.endMinute - part.startMinute)), 540);
+  });
 }

@@ -62,6 +62,32 @@ Map<String, int> categoryMinutes(Iterable<PlannedInterval> intervals) {
   return totals;
 }
 
+/// Splits a minute-of-day interval into the one or two calendar days it
+/// touches. Overnight intervals (end <= start) are split at midnight so the
+/// same logical block can be rendered on both days without double counting
+/// its total duration.
+List<({int dayOffset, int startMinute, int endMinute})> splitDailyInterval(
+  int startMinute,
+  int endMinute,
+) {
+  final start = startMinute.clamp(0, 1439).toInt();
+  final end = endMinute.clamp(1, 1440).toInt();
+  if (end > start) {
+    return [(dayOffset: 0, startMinute: start, endMinute: end)];
+  }
+  final parts = <({int dayOffset, int startMinute, int endMinute})>[];
+  if (start < 1440) {
+    parts.add((dayOffset: 0, startMinute: start, endMinute: 1440));
+  }
+  if (end > 0) {
+    parts.add((dayOffset: 1, startMinute: 0, endMinute: end));
+  }
+  if (parts.isEmpty) {
+    parts.add((dayOffset: 0, startMinute: start, endMinute: end));
+  }
+  return parts;
+}
+
 bool isNightTheme(DateTime localTime, {int dayStartHour = 7, int nightStartHour = 19}) {
   final minute = localTime.hour * 60 + localTime.minute;
   final dayStart = dayStartHour * 60;

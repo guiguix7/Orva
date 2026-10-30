@@ -20,7 +20,7 @@ final class AppDatabase extends GeneratedDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   Iterable<TableInfo<Table, Object>> get allTables => const <TableInfo<Table, Object>>[];
@@ -51,6 +51,17 @@ final class AppDatabase extends GeneratedDatabase {
               _studySchema,
               _nutritionSchema,
               _obligationSchema,
+            ]) {
+              for (final statement in schema) {
+                await customStatement(statement);
+              }
+            }
+          }
+          if (from < 5) {
+            for (final schema in [
+              _executionSchema,
+              _habitSchema,
+              _countdownSchema,
             ]) {
               for (final statement in schema) {
                 await customStatement(statement);
@@ -218,6 +229,9 @@ final class AppDatabase extends GeneratedDatabase {
     ..._studySchema,
     ..._nutritionSchema,
     ..._obligationSchema,
+    ..._executionSchema,
+    ..._habitSchema,
+    ..._countdownSchema,
   ];
 
   /// Datado histórico de peso. Cada registro é um ponto no tempo; medições
@@ -473,5 +487,72 @@ final class AppDatabase extends GeneratedDatabase {
       CHECK(status IN ('planned','completed','skipped'))
     )''',
     'CREATE INDEX obligation_occurrences_date_idx ON obligation_occurrences(occurrence_date, status)',
+  ];
+
+  /// Real executions of planned or ad-hoc activities. A row here means time
+  /// was actually spent; planned blocks remain distinct (planejado != realizado).
+  static const List<String> _executionSchema = [
+    '''CREATE TABLE executions (
+      id TEXT PRIMARY KEY NOT NULL,
+      reference_type TEXT NOT NULL DEFAULT 'custom',
+      reference_id TEXT,
+      category TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      duration_minutes INTEGER NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual',
+      reference_date TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      CHECK(duration_minutes > 0),
+      CHECK(reference_type IN ('routine_block','obligation','hobby','study','habit','custom'))
+    )''',
+    'CREATE INDEX executions_date_idx ON executions(reference_date, started_at)',
+    'CREATE INDEX executions_category_idx ON executions(category, reference_date)',
+  ];
+
+  /// Quantitative habits with a unit and optional daily target.
+  static const List<String> _habitSchema = [
+    '''CREATE TABLE habits (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'vezes',
+      target_value REAL,
+      category TEXT NOT NULL DEFAULT '',
+      active_days_json TEXT NOT NULL DEFAULT '[]',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK(target_value IS NULL OR target_value > 0)
+    )''',
+    'CREATE INDEX habits_active_idx ON habits(is_active, name COLLATE NOCASE)',
+    '''CREATE TABLE habit_logs (
+      id TEXT PRIMARY KEY NOT NULL,
+      habit_id TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+      log_date TEXT NOT NULL,
+      quantity REAL NOT NULL DEFAULT 0,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(habit_id, log_date),
+      CHECK(quantity >= 0)
+    )''',
+    'CREATE INDEX habit_logs_date_idx ON habit_logs(log_date, habit_id)',
+  ];
+
+  /// Important dates and countdowns. Past dates are kept for history.
+  static const List<String> _countdownSchema = [
+    '''CREATE TABLE countdowns (
+      id TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL,
+      target_date TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      is_archived INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )''',
+    'CREATE INDEX countdowns_date_idx ON countdowns(is_archived, target_date)',
   ];
 }
