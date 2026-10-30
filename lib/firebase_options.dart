@@ -15,7 +15,20 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
+  static const _apiKey = String.fromEnvironment('FIREBASE_API_KEY');
+  static const _appId = String.fromEnvironment('FIREBASE_APP_ID');
+  static const _messagingSenderId =
+      String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+  static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  static const _storageBucket =
+      String.fromEnvironment('FIREBASE_STORAGE_BUCKET');
+
   static FirebaseOptions get currentPlatform {
+    if (_apiKey.isEmpty || _appId.isEmpty || _projectId.isEmpty) {
+      throw UnsupportedError(
+        'Firebase is not configured. Provide the FIREBASE_* dart-defines.',
+      );
+    }
     if (kIsWeb) {
       throw UnsupportedError(
         'DefaultFirebaseOptions have not been configured for web - '
@@ -53,10 +66,10 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCfJhAV1rmE4vJg7vvH_Ec7udEZVm8wFMk',
-    appId: '1:273385324967:android:0a05b240f056c4a3ae7682',
-    messagingSenderId: '273385324967',
-    projectId: 'orva-8a92b',
-    storageBucket: 'orva-8a92b.firebasestorage.app',
+    apiKey: _apiKey,
+    appId: _appId,
+    messagingSenderId: _messagingSenderId,
+    projectId: _projectId,
+    storageBucket: _storageBucket,
   );
 }
