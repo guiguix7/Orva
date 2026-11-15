@@ -1,0 +1,18 @@
+---
+description: Canonical product and engineering constraints for the Orva Flutter repository.
+alwaysApply: true
+---
+
+Read repository-root AGENTS.md before acting. It is the canonical source of truth.
+
+For non-trivial tasks, also read PROMPT_MASTER.md, .agents/skills/orva-engineering/SKILL.md, docs/agents/CURRENT_STATE.md, docs/product/PRODUCT_VISION.md, docs/product/ROADMAP.md, and the relevant docs/specs/ files.
+
+Never infer implementation status from planning prose. Inspect Dart source, Drift schema/migrations, tests, and CI. Preserve local-first privacy, reuse existing source records, distinguish planned from completed activity, and test date/time boundaries.
+
+Binding decisions:
+- Fixed comparison pair: Beto and Alfredo; customize presentation and traits, not pair count.
+- Android widgets first; iOS later.
+- Missions are manual and record-integrated.
+- Follow the priority order in docs/product/ROADMAP.md.
+
+UI copy is pt-BR. Technical identifiers/docs are English by default. Every schema change requires versioned migration tests and backup compatibility checks. Report only checks actually executed. Never overwrite user work or perform destructive git operations.
