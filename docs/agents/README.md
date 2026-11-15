@@ -18,12 +18,14 @@ This directory defines how coding agents understand, plan, implement, test, and 
 | Agent/tool | Entry file |
 |---|---|
 | Codex and AGENTS-compatible agents | AGENTS.md |
-| Claude Code | CLAUDE.md and AGENTS.md |
+| Claude Code | CLAUDE.md and .claude/skills/orva-engineering/SKILL.md |
 | GitHub Copilot | .github/copilot-instructions.md |
 | Cursor | .cursor/rules/orva.mdc |
+| Gemini CLI | GEMINI.md |
+| OpenCode | .agents/skills/orva-engineering/SKILL.md |
 | Other coding agents | AGENTS.md and PROMPT_MASTER.md |
 
-Adapters must point to the same canonical requirements. Do not let tool-specific files drift into conflicting product decisions.
+Adapters point to shared canonical rules. Do not let tool-specific files drift into conflicting product decisions.
 
 ## Feature specifications
 
