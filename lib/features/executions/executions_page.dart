@@ -8,6 +8,83 @@ import '../../core/database/orva_repository.dart';
 import '../../core/database/executions_repository.dart';
 import '../../core/widgets/orva_widgets.dart';
 
+/// Manual execution editor shared by the executions screen and the Home quick
+/// actions. It always persists through the executions repository, so a real
+/// record exists exactly once and is never inferred from a planned block.
+Future<bool?> showExecutionEditor(
+  BuildContext context,
+  WidgetRef ref, {
+  String initialTitle = '',
+  String initialCategory = '',
+  int initialMinutes = 25,
+}) async {
+  final titleCtrl = TextEditingController(text: initialTitle);
+  final categoryCtrl = TextEditingController(text: initialCategory);
+  final minutesCtrl = TextEditingController(text: '$initialMinutes');
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (dialog) => AlertDialog(
+      title: const Text('Registrar execução manual'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: titleCtrl,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Título *'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: categoryCtrl,
+            decoration: const InputDecoration(labelText: 'Categoria'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: minutesCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Minutos'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialog, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialog, true),
+          child: const Text('Salvar'),
+        ),
+      ],
+    ),
+  );
+  final rawTitle = titleCtrl.text.trim();
+  final rawCategory = categoryCtrl.text.trim();
+  final rawMinutes = minutesCtrl.text.trim();
+  titleCtrl.dispose();
+  categoryCtrl.dispose();
+  minutesCtrl.dispose();
+  if (ok != true) return false;
+  try {
+    final minutes = int.tryParse(rawMinutes) ?? 0;
+    final now = DateTime.now();
+    await ref
+        .read(repositoryProvider)
+        .saveExecution(
+          title: rawTitle,
+          category: rawCategory,
+          durationMinutes: minutes <= 0 ? 1 : minutes,
+          startedAt: now,
+          source: 'manual',
+          referenceDate: now,
+        );
+    return true;
+  } catch (error) {
+    if (context.mounted) showOrvaError(context, error);
+    return false;
+  }
+}
+
 class ExecutionsPage extends ConsumerStatefulWidget {
   const ExecutionsPage({super.key});
   @override
@@ -38,7 +115,9 @@ class _ExecutionsPageState extends ConsumerState<ExecutionsPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final items = await ref.read(repositoryProvider).getExecutions(from: DateTime.now(), to: DateTime.now());
+      final items = await ref
+          .read(repositoryProvider)
+          .getExecutions(from: DateTime.now(), to: DateTime.now());
       if (!mounted) return;
       setState(() {
         _items = items;
@@ -56,7 +135,8 @@ class _ExecutionsPageState extends ConsumerState<ExecutionsPage> {
     _stopwatch = Stopwatch()..start();
     _running = true;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _elapsedSeconds = _stopwatch!.elapsed.inSeconds);
+      if (mounted)
+        setState(() => _elapsedSeconds = _stopwatch!.elapsed.inSeconds);
     });
     setState(() {});
   }
@@ -72,7 +152,8 @@ class _ExecutionsPageState extends ConsumerState<ExecutionsPage> {
     _stopwatch?.start();
     _running = true;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _elapsedSeconds = _stopwatch!.elapsed.inSeconds);
+      if (mounted)
+        setState(() => _elapsedSeconds = _stopwatch!.elapsed.inSeconds);
     });
     setState(() {});
   }
@@ -93,16 +174,32 @@ class _ExecutionsPageState extends ConsumerState<ExecutionsPage> {
       context: context,
       builder: (dialog) => AlertDialog(
         title: const Text('Registrar tempo'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Tempo decorrido: ${_format(seconds)}'),
-          const SizedBox(height: 8),
-          TextField(controller: titleCtrl, autofocus: true, decoration: const InputDecoration(labelText: 'Título *')),
-          const SizedBox(height: 8),
-          TextField(controller: categoryCtrl, decoration: const InputDecoration(labelText: 'Categoria')),
-        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Tempo decorrido: ${_format(seconds)}'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: titleCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Título *'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: categoryCtrl,
+              decoration: const InputDecoration(labelText: 'Categoria'),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Descartar')),
-          FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Salvar')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('Descartar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Salvar'),
+          ),
         ],
       ),
     );
@@ -111,15 +208,17 @@ class _ExecutionsPageState extends ConsumerState<ExecutionsPage> {
     }
     try {
       final now = DateTime.now();
-      await ref.read(repositoryProvider).saveExecution(
-        title: titleCtrl.text,
-        category: categoryCtrl.text,
-        durationMinutes: minutes,
-        startedAt: now.subtract(Duration(seconds: seconds)),
-        endedAt: now,
-        source: 'timer',
-        referenceDate: now,
-      );
+      await ref
+          .read(repositoryProvider)
+          .saveExecution(
+            title: titleCtrl.text,
+            category: categoryCtrl.text,
+            durationMinutes: minutes,
+            startedAt: now.subtract(Duration(seconds: seconds)),
+            endedAt: now,
+            source: 'timer',
+            referenceDate: now,
+          );
       await _load();
     } catch (error) {
       if (mounted) showOrvaError(context, error);
@@ -136,120 +235,129 @@ class _ExecutionsPageState extends ConsumerState<ExecutionsPage> {
   }
 
   Future<void> _manual() async {
-    final titleCtrl = TextEditingController();
-    final categoryCtrl = TextEditingController();
-    final minutesCtrl = TextEditingController(text: '25');
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('Registrar execução manual'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: titleCtrl, autofocus: true, decoration: const InputDecoration(labelText: 'Título *')),
-          const SizedBox(height: 8),
-          TextField(controller: categoryCtrl, decoration: const InputDecoration(labelText: 'Categoria')),
-          const SizedBox(height: 8),
-          TextField(controller: minutesCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Minutos')),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Salvar')),
-        ],
-      ),
-    );
-    if (ok != true) {
-      return;
-    }
-    try {
-      final minutes = int.tryParse(minutesCtrl.text.trim()) ?? 0;
-      final now = DateTime.now();
-      await ref.read(repositoryProvider).saveExecution(
-        title: titleCtrl.text,
-        category: categoryCtrl.text,
-        durationMinutes: minutes <= 0 ? 1 : minutes,
-        startedAt: now,
-        source: 'manual',
-        referenceDate: now,
-      );
-      await _load();
-    } catch (error) {
-      if (mounted) showOrvaError(context, error);
-    } finally {
-      titleCtrl.dispose();
-      categoryCtrl.dispose();
-      minutesCtrl.dispose();
-    }
+    await showExecutionEditor(context, ref);
+    await _load();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Execuções reais')),
-      floatingActionButton: FloatingActionButton(onPressed: _manual, child: const Icon(Icons.add)),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(children: [
-                Text(_format(_elapsedSeconds), style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 8),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  if (!_running && _elapsedSeconds == 0)
-                    FilledButton.icon(onPressed: _startStopwatch, icon: const Icon(Icons.play_arrow), label: const Text('Iniciar'))
-                  else if (_running)
-                    FilledButton.icon(onPressed: _pauseStopwatch, icon: const Icon(Icons.pause), label: const Text('Pausar'))
-                  else ...[
-                    FilledButton.icon(onPressed: _resumeStopwatch, icon: const Icon(Icons.play_arrow), label: const Text('Continuar')),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(onPressed: _finishStopwatch, icon: const Icon(Icons.stop), label: const Text('Encerrar')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _manual,
+        child: const Icon(Icons.add),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text(
+                      _format(_elapsedSeconds),
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (!_running && _elapsedSeconds == 0)
+                          FilledButton.icon(
+                            onPressed: _startStopwatch,
+                            icon: const Icon(Icons.play_arrow),
+                            label: const Text('Iniciar'),
+                          )
+                        else if (_running)
+                          FilledButton.icon(
+                            onPressed: _pauseStopwatch,
+                            icon: const Icon(Icons.pause),
+                            label: const Text('Pausar'),
+                          )
+                        else ...[
+                          FilledButton.icon(
+                            onPressed: _resumeStopwatch,
+                            icon: const Icon(Icons.play_arrow),
+                            label: const Text('Continuar'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: _finishStopwatch,
+                            icon: const Icon(Icons.stop),
+                            label: const Text('Encerrar'),
+                          ),
+                        ],
+                        if (_elapsedSeconds > 0 && !_running) ...[
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              _stopwatch?.stop();
+                              _timer?.cancel();
+                              _elapsedSeconds = 0;
+                              _stopwatch = null;
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Descartar'),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
-                  if (_elapsedSeconds > 0 && !_running) ...[
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(onPressed: () {
-                      _stopwatch?.stop();
-                      _timer?.cancel();
-                      _elapsedSeconds = 0;
-                      _stopwatch = null;
-                      setState(() {});
-                    }, icon: const Icon(Icons.delete_outline), label: const Text('Descartar')),
-                  ],
-                ]),
-              ]),
+                ),
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _items.isEmpty
-                  ? OrvaEmptyState(icon: Icons.timer_outlined, title: 'Nenhuma execução hoje', message: 'Use o cronômetro ou registre manualmente.', actionLabel: 'Registrar', onAction: _manual)
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _items.length,
-                      itemBuilder: (context, index) {
-                        final e = _items[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            title: Text(e['title'] as String),
-                            subtitle: Text('${e['category'] ?? ''} • ${formatMinutes(e['duration_minutes'] as int)} • ${DateFormat('HH:mm').format(DateTime.parse(e['started_at'] as String))}'),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () async {
-                                final ok = await confirmAction(context, title: 'Excluir?', message: 'Remover este registro?', actionLabel: 'Excluir', destructive: true);
-                                if (ok) {
-                                  await ref.read(repositoryProvider).deleteExecution(e['id'] as String);
-                                  await _load();
-                                }
-                              },
-                            ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _items.isEmpty
+                ? OrvaEmptyState(
+                    icon: Icons.timer_outlined,
+                    title: 'Nenhuma execução hoje',
+                    message: 'Use o cronômetro ou registre manualmente.',
+                    actionLabel: 'Registrar',
+                    onAction: _manual,
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      final e = _items[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          title: Text(e['title'] as String),
+                          subtitle: Text(
+                            '${e['category'] ?? ''} • ${formatMinutes(e['duration_minutes'] as int)} • ${DateFormat('HH:mm').format(DateTime.parse(e['started_at'] as String))}',
                           ),
-                        );
-                      },
-                    ),
-        ),
-      ]),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () async {
+                              final ok = await confirmAction(
+                                context,
+                                title: 'Excluir?',
+                                message: 'Remover este registro?',
+                                actionLabel: 'Excluir',
+                                destructive: true,
+                              );
+                              if (ok) {
+                                await ref
+                                    .read(repositoryProvider)
+                                    .deleteExecution(e['id'] as String);
+                                await _load();
+                              }
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -284,6 +284,7 @@ void main() {
       'foods','meal_plans','meal_plan_items','food_consumptions','food_consumption_items',
       'obligation_rules','obligation_exceptions','obligation_occurrences',
       'executions','habits','habit_logs','countdowns',
+      'comparison_profiles','comparison_traits','comparison_checkins',
     ];
     for (final table in newTables) {
       data.remove(table);

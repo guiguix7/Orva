@@ -20,7 +20,7 @@ final class AppDatabase extends GeneratedDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   Iterable<TableInfo<Table, Object>> get allTables => const <TableInfo<Table, Object>>[];
@@ -55,6 +55,11 @@ final class AppDatabase extends GeneratedDatabase {
               for (final statement in schema) {
                 await customStatement(statement);
               }
+            }
+          }
+          if (from < 6) {
+            for (final statement in _comparisonSchema) {
+              await customStatement(statement);
             }
           }
           if (from < 5) {
@@ -232,6 +237,7 @@ final class AppDatabase extends GeneratedDatabase {
     ..._executionSchema,
     ..._habitSchema,
     ..._countdownSchema,
+    ..._comparisonSchema,
   ];
 
   /// Datado histórico de peso. Cada registro é um ponto no tempo; medições
@@ -554,5 +560,52 @@ final class AppDatabase extends GeneratedDatabase {
       updated_at TEXT NOT NULL
     )''',
     'CREATE INDEX countdowns_date_idx ON countdowns(is_archived, target_date)',
+  ];
+
+  /// Fixed Beto/Alfredo presentation plus editable, measurable trait rules.
+  /// Check-ins are the only evidence this module stores; record-based traits
+  /// read habit logs and study sessions instead of duplicating them.
+  static const List<String> _comparisonSchema = [
+    '''CREATE TABLE comparison_profiles (
+      role TEXT PRIMARY KEY NOT NULL,
+      display_name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL,
+      CHECK(role IN ('beto','alfredo'))
+    )''',
+    '''CREATE TABLE comparison_traits (
+      id TEXT PRIMARY KEY NOT NULL,
+      label TEXT NOT NULL,
+      explanation TEXT NOT NULL DEFAULT '',
+      target_character TEXT NOT NULL,
+      measurement_type TEXT NOT NULL,
+      source_id TEXT,
+      threshold REAL NOT NULL,
+      unit TEXT NOT NULL DEFAULT '',
+      weight REAL NOT NULL DEFAULT 1,
+      window_days INTEGER NOT NULL DEFAULT 0,
+      is_sensitive INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CHECK(target_character IN ('beto','alfredo')),
+      CHECK(measurement_type IN ('manual','habit_quantity','study_minutes')),
+      CHECK(threshold > 0),
+      CHECK(weight > 0),
+      CHECK(window_days >= 0 AND window_days <= 365),
+      CHECK(is_sensitive IN (0,1)),
+      CHECK(is_active IN (0,1))
+    )''',
+    'CREATE INDEX comparison_traits_active_idx ON comparison_traits(is_active, created_at)',
+    '''CREATE TABLE comparison_checkins (
+      id TEXT PRIMARY KEY NOT NULL,
+      trait_id TEXT NOT NULL REFERENCES comparison_traits(id) ON DELETE CASCADE,
+      checkin_date TEXT NOT NULL,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(trait_id, checkin_date)
+    )''',
+    'CREATE INDEX comparison_checkins_date_idx ON comparison_checkins(checkin_date, trait_id)',
   ];
 }

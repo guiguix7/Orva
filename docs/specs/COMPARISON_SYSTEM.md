@@ -1,6 +1,6 @@
 # Feature Specification — Beto vs Alfredo Comparison
 
-Status: SPECIFIED / NOT IMPLEMENTED in the 2026-10-30 audited tree. Re-audit before coding.
+Status: PARTIALLY IMPLEMENTED — v1 MVP (schema v6). See implementation notes at the end.
 
 Priority: P0 — Extremely urgent.
 
@@ -163,3 +163,31 @@ Local by default. Do not log trait values, check-ins, or evidence. Do not show c
 - Exact default templates and weights.
 
 Do not silently hard-code these choices into persisted data.
+
+## 12. Implementation notes — v1 MVP (schema v6)
+
+Delivered:
+
+- Fixed pair: `comparison_profiles` rows `alfredo` and `beto`; display name and description are editable, roles are not.
+- `comparison_traits` stores label, explanation, target character, measurement type, optional source, threshold, unit, weight, optional per-trait window, sensitive flag, active flag, timestamps.
+- Measurements implemented: manual check-in, habit quantity, study minutes. Record-based traits read `habit_logs` / `study_sessions`; nothing is re-entered or duplicated.
+- `comparison_checkins` is unique per trait and local date, so repeating a check-in overwrites instead of duplicating evidence.
+- Scoring lives in `lib/core/domain/comparison_scoring.dart` (pure). Outcome per trait: target side when the threshold is reached, `neutral` when evidence exists but is below it, `unknown` when the source has no eligible evidence. Unknown and neutral are excluded from the denominator, so no result is hard-coded to 50/50.
+- Four editable templates are seeded once (never activity evidence). Sensitive traits are stored inactive and require explicit activation.
+- Backup format v6 includes the three comparison tables; v3, v4 and v5 backups upgrade in memory by adding empty collections.
+
+Decisions taken for this slice:
+
+- One period selector on the screen (last 7 days, last 30 days, current week, current month) persisted as `comparison_period`. A trait-level `window_days` overrides it; `0` follows the selector.
+- Results are live projections. Closed-period snapshots are not implemented yet.
+- Manual evidence is one occurrence per local day per trait (not a daily 1-5 review scale).
+- Character names are editable; internal roles stay `beto`/`alfredo`.
+
+Known gaps:
+
+- No immutable history/versioning of reviewed periods.
+- No evidence-history screen (per-day list) and no export-only trait report.
+- No coupling to XP, missions, analytics or widgets yet; those must read this projection rather than store a second score.
+- No opportunity-based inference: absence of a log is always `unknown`, never a point for either side.
+
+Validation: `test/comparison_test.dart` covers threshold/neutral/unknown outcomes, weighting, coverage, week/month/leap-day windows, check-in idempotency, habit and study reuse, sensitive opt-in, cascade delete, backup v6 round-trip, v5 upgrade, and the v5→v6 schema migration.

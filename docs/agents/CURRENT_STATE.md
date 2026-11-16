@@ -7,7 +7,7 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 - Flutter / Dart application.
 - Riverpod for state/dependency access.
 - Drift over SQLite for local persistence.
-- Drift schema version observed: 5.
+- Drift schema version observed: 6 (v6 added `comparison_profiles`, `comparison_traits`, `comparison_checkins`).
 - Main shell tabs: Hoje, Checklists, Metas, Mais.
 - Database/repositories: lib/core/database/.
 - Pure domain calculations: lib/core/domain/.
@@ -25,7 +25,7 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 | Home | lib/features/home/home_page.dart | Daily summary/focus and linked data exist; inspect exact current behavior. |
 | Checklists | lib/features/checklists/ and repository | Existing checklist/occurrence system; investigate reuse before creating missions. |
 | Goals | lib/features/goals/goals_page.dart | CRUD/status/history; inspected editor uses manual progress. |
-| Routine | lib/features/routine/routine_page.dart | Date-focused blocks, templates, overlap checks, obligation/meal projections, execution totals. |
+| Calendar | lib/features/calendar/, calendar_repository.dart, lib/core/domain/calendar_layout.dart | Day timeline, week and month views over routine blocks, obligations, meal plans and executions. Block editor and weekly templates live in lib/features/routine/routine_editor.dart. |
 | Obligations | lib/core/database/obligations_repository.dart | Recurrence, date exceptions, occurrences, overnight-aware blocks. |
 | Studies | lib/features/studies/study_page.dart and study_repository.dart | Subject/topic/session/review/summary methods exist; completeness requires re-audit. |
 | Nutrition | lib/features/nutrition/nutrition_page.dart and nutrition_repository.dart | Food catalogue, meal plans, actual consumption, nutrition summaries, planned meal blocks. |
@@ -34,16 +34,17 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 | Hobbies | lib/features/hobbies/ | Hobby records and sessions. |
 | Notes / journal | lib/features/notes/ and lib/features/journal/ | Local notes and date-based journal. |
 | Countdown | lib/features/countdowns/ | Countdown surface. |
+| Alter egos | lib/features/comparison/, comparison_repository.dart, lib/core/domain/comparison_scoring.dart | Beto vs Alfredo MVP: editable traits, manual check-ins, habit/study-derived evidence, weighted score with coverage. Live projection, no snapshots yet. |
 | Profile | lib/features/profile/ | Local profile/body records; sensitive. |
 | Security | lib/features/security/ and lib/core/security/ | PIN/biometric code exists; this is not database encryption. |
 | Developer console | lib/features/settings/developer_console_page.dart | Debug diagnostics; review sanitization before adding logs. |
 
 ## 3. Gaps observed in the audited tree
 
-- Routine view is day/date-focused. Full day/week/month calendar experience was not established.
+- The day/week/month calendar now exists. Drag-and-drop move/resize and immutable history are still missing.
 - Goal progress in inspected editor is manual; complete aggregation from linked records was not established.
 - No production Android launcher widget implementation was found.
-- No Beto/Alfredo comparison feature was found.
+- Beto/Alfredo comparison exists as a v1 MVP (queries + UI + tests). Missing: immutable closed-period history, per-trait evidence history view, and any XP/analytics coupling.
 - A complete manual + record-derived recurring mission domain was not established. Existing checklists may be reusable but semantics must be reviewed.
 - No complete XP/level/achievement/prestige system was found.
 - Historical analytics beyond existing summaries/charts are incomplete and need metric definitions.

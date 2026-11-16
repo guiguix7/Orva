@@ -796,7 +796,7 @@ final class OrvaRepository {
 
   // Backup format is explicit and versioned. Import callers must confirm data
   // replacement with the user before calling importBackup.
-  static const backupVersion = 5;
+  static const backupVersion = 6;
   static const _legacyBackupTablesV3 = <String>{
     'categories','goals','goal_progress_history','checklists','checklist_items',
     'checklist_occurrences','checklist_occurrence_items','routine_blocks','hobbies',
@@ -835,7 +835,17 @@ final class OrvaRepository {
     'habits',
     'habit_logs',
     'countdowns',
+    'comparison_profiles',
+    'comparison_traits',
+    'comparison_checkins',
     'settings',
+  ];
+
+  /// Tabelas introduzidas no backup v6 (comparação Beto/Alfredo).
+  static const _comparisonTables = <String>[
+    'comparison_profiles',
+    'comparison_traits',
+    'comparison_checkins',
   ];
 
   /// Chaves de settings nunca incluídas no backup: PIN e flags de segurança.
@@ -879,6 +889,7 @@ final class OrvaRepository {
       final oldData = decoded['data'];
       final expectedKeys = version == 3 ? _legacyBackupTablesV3 : _backupTables.toSet().difference(const {
         'executions', 'habits', 'habit_logs', 'countdowns',
+        'comparison_profiles', 'comparison_traits', 'comparison_checkins',
       });
       if (oldData is! Map<String, dynamic> ||
           oldData.keys.toSet().length != expectedKeys.length ||
@@ -892,9 +903,32 @@ final class OrvaRepository {
               'foods','meal_plans','meal_plan_items','food_consumptions','food_consumption_items',
               'obligation_rules','obligation_exceptions','obligation_occurrences',
               'executions','habits','habit_logs','countdowns',
+              'comparison_profiles','comparison_traits','comparison_checkins',
             ]
-          : const ['executions', 'habits', 'habit_logs', 'countdowns'];
+          : const [
+          'executions', 'habits', 'habit_logs', 'countdowns',
+          'comparison_profiles', 'comparison_traits', 'comparison_checkins',
+        ];
       for (final table in missingTables) {
+        upgradedData[table] = <dynamic>[];
+      }
+      decoded = <String, dynamic>{
+        ...decoded,
+        'version': backupVersion,
+        'data': upgradedData,
+      };
+    }
+    if (decoded['version'] == 5) {
+      // v5 predates the comparison module: add its empty collections.
+      final oldData = decoded['data'];
+      final expectedKeys = _backupTables.toSet().difference(_comparisonTables.toSet());
+      if (oldData is! Map<String, dynamic> ||
+          oldData.keys.toSet().length != expectedKeys.length ||
+          !oldData.keys.toSet().containsAll(expectedKeys)) {
+        throw const FormatException('A estrutura do backup v5 é incompatível.');
+      }
+      final upgradedData = Map<String, dynamic>.from(oldData);
+      for (final table in _comparisonTables) {
         upgradedData[table] = <dynamic>[];
       }
       decoded = <String, dynamic>{
@@ -945,6 +979,9 @@ final class OrvaRepository {
       'habits': {'id','name','unit','target_value','category','active_days_json','is_active','created_at','updated_at'},
       'habit_logs': {'id','habit_id','log_date','quantity','note','created_at','updated_at'},
       'countdowns': {'id','title','target_date','category','description','is_archived','created_at','updated_at'},
+      'comparison_profiles': {'role','display_name','description','updated_at'},
+      'comparison_traits': {'id','label','explanation','target_character','measurement_type','source_id','threshold','unit','weight','window_days','is_sensitive','is_active','created_at','updated_at'},
+      'comparison_checkins': {'id','trait_id','checkin_date','note','created_at','updated_at'},
       'settings': {'setting_key','setting_value','updated_at'},
     };
 
@@ -962,6 +999,10 @@ final class OrvaRepository {
           if (item['setting_key'] is! String || (item['setting_key'] as String).isEmpty) {
             throw const FormatException('Há uma preferência sem chave no backup.');
           }
+        } else if (table == 'comparison_profiles') {
+          if (item['role'] is! String || (item['role'] as String).isEmpty) {
+            throw const FormatException('Há um personagem sem papel no backup.');
+          }
         } else if (item['id'] is! String || (item['id'] as String).isEmpty) {
           throw FormatException('Há um registro sem identificador em "$table".');
         }
@@ -978,6 +1019,7 @@ final class OrvaRepository {
         'goal_progress_history','routine_blocks','routine_template_blocks','routine_templates',
         'hobby_sessions','hobbies','journal_entries','weight_entries','notes','goals','categories',
         'executions','habit_logs','habits','countdowns',
+        'comparison_checkins','comparison_traits','comparison_profiles',
       ]) {
         await execute('DELETE FROM $table');
       }

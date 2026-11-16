@@ -1,6 +1,6 @@
 # Feature Specification — Calendar and Time Blocking
 
-Status: PARTIALLY IMPLEMENTED foundation; full day/week/month calendar experience was not established in the audited tree.
+Status: PARTIALLY IMPLEMENTED — day/week/month calendar UI, timeline, overlap lanes, conflicts and free-time metrics are implemented (see Implementation notes). Drag/resize and immutable history are not implemented.
 
 Priority: P1 — Urgent.
 
@@ -75,3 +75,29 @@ Separate planned duration, actual execution duration, completed records, and ski
 8. Recurring-rule edits preserve completed history.
 9. Small screens, text scaling, themes, keyboard, and semantics work.
 10. Unit/widget/integration tests cover period and date boundaries.
+
+## 10. Implementation notes — calendar slice
+
+Delivered:
+
+- `lib/features/calendar/` replaces the old routine page as the single scheduling surface. `Mais → Calendário e tempo` and the Home shortcuts open it.
+- Day view: 24h timeline with hour gutter, positioned blocks, overlap lanes (side by side, never hiding each other), a live "now" line for today, tap on empty space to create a block at that time, and tap on a block for a details sheet (edit / duplicate / delete / open source).
+- Week view: wide screens get a seven-column time grid with a shared axis; phones get seven readable day rows with a proportional activity strip, totals and conflict count instead of compressed columns.
+- Month view: Monday-first six-week grid, discreet activity dots, today/selected states, and a selected-day preview that opens the day view.
+- Sources stay separate and are labelled: routine blocks (editable, planned), obligations and meal plans (read-only, planned commitments), executions (read-only, real spent time). Planned time never counts as executed and executions never consume free-time slots.
+- Summary strip: planned (union, no double counting), free time, executed time when evidence exists, and conflict count.
+- `routine_editor.dart` holds the shared block editor and templates dialog; the editor now accepts an initial start time and block kind so the timeline can create blocks at the tapped hour.
+
+Projection rules:
+
+- The calendar reads through `CalendarRepository`; it never writes schedule data and owns no tables. No migration was required.
+- Overlaps are reported, not silently rejected, matching the existing routine behavior.
+
+Known gaps:
+
+- Drag-and-drop move/resize is not implemented; edits go through the block editor dialog.
+- No recurring-event editing from the timeline beyond the existing weekday/date block kinds.
+- Week/month activity counts include routine blocks and executions only (obligations are generated per day and are excluded from the month projection for cost).
+- Calendar visuals were verified in Chromium at phone width; wide-window capture in this environment is affected by a Flutter Web DPR sizing artifact (see handoff).
+
+Validation: `test/calendar_layout_test.dart` (lanes, gaps, totals, conflicts, week/month grids), `test/calendar_repository_test.dart` (merged read model, single source per record, day/week/month loading) and `test/calendar_widget_test.dart` (no overflow at 390 and 1440).

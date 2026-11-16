@@ -1,30 +1,44 @@
 import 'dart:async';
-import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/database/calendar_repository.dart';
+import '../../core/database/habits_repository.dart';
 import '../../core/database/orva_repository.dart';
+import '../../core/database/study_repository.dart';
+import '../../core/domain/calendar_layout.dart';
+import '../../core/domain/home_overview.dart';
 import '../../core/domain/orva_calculations.dart';
-import '../../core/database/obligations_repository.dart';
-import '../../core/database/nutrition_repository.dart';
-import '../obligations/obligations_page.dart';
-import '../nutrition/nutrition_page.dart';
-import '../studies/study_page.dart';
+import '../../core/logging/orva_diagnostics.dart';
 import '../../core/theme/orva_theme.dart';
+import '../../core/theme/orva_tokens.dart';
 import '../../core/widgets/orva_widgets.dart';
+import '../calendar/calendar_page.dart';
 import '../checklists/checklists_page.dart';
+import '../executions/executions_page.dart';
 import '../goals/goals_page.dart';
-import '../hobbies/hobbies_page.dart';
-import '../journal/journal_page.dart';
-import '../notes/notes_page.dart';
-import '../routine/routine_page.dart';
+import '../habits/habits_page.dart';
+import '../obligations/obligations_page.dart';
 import '../quotes/quotes_data.dart';
+import '../routine/routine_editor.dart';
+import 'home_widgets.dart';
 
+/// Home = command center.
+///
+/// It answers, in order: what is happening today, what comes next, what is
+/// still open, how much time was planned versus actually executed and which
+/// evidence-backed progress exists. Everything is a projection over records
+/// owned by their own repositories; the Home never stores its own agenda.
 class HomePage extends ConsumerStatefulWidget {
-  const HomePage({super.key, required this.onNavigate, required this.refreshSignal});
+  const HomePage({
+    super.key,
+    required this.onNavigate,
+    required this.refreshSignal,
+  });
+
   final ValueChanged<int> onNavigate;
   final int refreshSignal;
 
@@ -37,19 +51,35 @@ class _HomePageState extends ConsumerState<HomePage> {
   DateTime _now = DateTime.now();
   Timer? _clock;
   String? _userName;
-  String? _focus;
-  Map<String, Object?> _summary = {};
-  List<Map<String, Object?>> _goals = [];
-  List<Map<String, Object?>> _items = [];
-  List<Map<String, Object?>> _routine = [];
-  List<Map<String, Object?>> _hobbies = [];
+  HomeOverview? _overview;
+  ChecklistDigest _checklist = ChecklistDigest.empty;
+  List<Map<String, Object?>> _items = const [];
+  List<Map<String, Object?>> _goals = const [];
+  List<CalendarEntry> _entries = const [];
+  List<HabitRecord> _habitRecords = const [];
+  HabitReport _habits = HabitReport.empty;
+  StudyDigest _study = const StudyDigest(
+    minutes: 0,
+    sessions: 0,
+    reviews: 0,
+    studyDays: 0,
+  );
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _clock = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      if (!mounted) return;
+      final now = DateTime.now();
+      final dayChanged = !isSameLocalDay(now, _now);
+      setState(() {
+        _now = now;
+        if (!dayChanged && _overview != null) {
+          _overview = HomeOverview.build(entries: _entries, now: now);
+        }
+      });
+      if (dayChanged) _load();
     });
     _load();
   }
@@ -67,7 +97,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _openPage(Widget page) async {
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => page));
     if (mounted) await _load();
   }
 
@@ -75,603 +106,562 @@ class _HomePageState extends ConsumerState<HomePage> {
     try {
       final repo = ref.read(repositoryProvider);
       final now = DateTime.now();
+      final day = DateTime(now.year, now.month, now.day);
+      final weekStart = DateTime(
+        day.year,
+        day.month,
+        day.day - (day.weekday - 1),
+      );
+
+      final habitRows = await repo.getHabits();
+      final habitRecords = <HabitRecord>[];
+      final logsByHabit = <String, Map<String, double>>{};
+      for (final row in habitRows) {
+        final id = row['id'] as String;
+        habitRecords.add(
+          HabitRecord(
+            id: id,
+            name: (row['name'] as String?)?.trim().isNotEmpty == true
+                ? row['name'] as String
+                : 'Hábito',
+            unit: (row['unit'] as String?)?.trim().isNotEmpty == true
+                ? row['unit'] as String
+                : 'vezes',
+            target: (row['target_value'] as num?)?.toDouble(),
+            activeWeekdays: _parseActiveDays(row['active_days_json']),
+          ),
+        );
+        final logRows = await repo.getHabitLogs(id, from: weekStart, to: day);
+        logsByHabit[id] = {
+          for (final log in logRows)
+            if (log['log_date'] is String)
+              log['log_date'] as String:
+                  (log['quantity'] as num?)?.toDouble() ?? 0,
+        };
+      }
+
       final values = await Future.wait<Object?>([
         repo.getSetting('user_name'),
-        repo.getSetting('focus_${repo.dateKey(now)}'),
-        repo.getTodaySummary(now),
+        repo.loadCalendarEntries(day),
+        repo.getTodayOccurrenceItems(day),
         repo.getGoals(status: 'active'),
-        repo.getTodayOccurrenceItems(now),
-        repo.getRoutineForDate(now),
-        repo.getWeeklyHobbyMinutes(date: now),
-        repo.getObligationTimeBlocksForDate(now),
-        repo.getMealPlanTimeBlocksForDate(now),
+        repo.getStudySummary(from: weekStart, to: day),
       ]);
+      final entries = (values[1] as List<CalendarEntry>).toList();
+      final items = values[2] as List<Map<String, Object?>>;
+      final completed = items
+          .where((item) => intValue(item['completed']) == 1)
+          .length;
+      final studyRow = values[4] as Map<String, Object?>;
+      final report = buildHabitReport(
+        habits: habitRecords,
+        logsByHabit: logsByHabit,
+        windowStart: weekStart,
+        today: day,
+      );
+
       if (!mounted) return;
-      final routineBlocks = values[5] as List<Map<String, Object?>>;
-      final hobbyRows = values[6] as List<Map<String, Object?>>;
-      final obligationBlocks = values[7] as List<Map<String, Object?>>;
-      final mealPlanBlocks = values[8] as List<Map<String, Object?>>;
-      final allBlocks = <Map<String, Object?>>[
-        ...routineBlocks,
-        ...obligationBlocks,
-        ...mealPlanBlocks,
-      ]..sort((a, b) => intValue(a['start_minute']).compareTo(intValue(b['start_minute'])));
-      final intervals = allBlocks.map((block) => PlannedInterval(
-        intValue(block['start_minute']),
-        intValue(block['end_minute']),
-        (block['category'] as String?)?.trim().isNotEmpty == true
-            ? block['category'] as String
-            : 'Sem categoria',
-        block['title'] as String? ?? '',
-      )).toList();
-      final summary = Map<String, Object?>.from(values[2] as Map<String, Object?>)
-        ..['routineBlocks'] = allBlocks.length
-        ..['plannedMinutes'] = occupiedMinutes(intervals)
-        ..['unplannedMinutes'] = 1440 - occupiedMinutes(intervals)
-        ..['plannedCategories'] = categoryMinutes(intervals);
       setState(() {
         _userName = (values[0] as String?)?.trim();
-        _focus = (values[1] as String?)?.trim();
-        _summary = summary;
+        _entries = entries;
+        _overview = HomeOverview.build(entries: entries, now: now);
+        _checklist = ChecklistDigest(completed: completed, total: items.length);
+        _items = items;
         _goals = (values[3] as List<Map<String, Object?>>).take(3).toList();
-        _items = (values[4] as List<Map<String, Object?>>).take(5).toList();
-        _routine = allBlocks;
-        _hobbies = hobbyRows.take(3).toList();
+        _habitRecords = habitRecords;
+        _habits = report;
+        _study = StudyDigest(
+          minutes: intValue(studyRow['minutes']),
+          sessions: intValue(studyRow['sessions']),
+          reviews: intValue(studyRow['reviews']),
+          studyDays: intValue(studyRow['studyDays']),
+        );
         _loading = false;
         _error = null;
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      OrvaDiagnostics.instance.recordException(
+        error,
+        stackTrace,
+        category: 'ui-operation',
+        module: 'home',
+      );
       if (!mounted) return;
-      setState(() { _loading = false; _error = '$error'; });
+      setState(() {
+        _loading = false;
+        _error = 'Não foi possível carregar o seu dia agora. Seus registros continuam salvos neste aparelho.';
+      });
     }
   }
 
-  Future<void> _quickAction() async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Criar algo novo', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 14),
-            _QuickActionTile(icon: Icons.check_circle_outline, title: 'Tarefa de hoje', subtitle: 'Adicionar um item ao checklist do dia', onTap: () => Navigator.pop(context, 'task')),
-            _QuickActionTile(icon: Icons.flag_outlined, title: 'Meta', subtitle: 'Transformar um objetivo em plano', onTap: () => Navigator.pop(context, 'goal')),
-            _QuickActionTile(icon: Icons.edit_note_outlined, title: 'Nota', subtitle: 'Guardar uma ideia ou informação', onTap: () => Navigator.pop(context, 'note')),
-            _QuickActionTile(icon: Icons.menu_book_outlined, title: 'Entrada no diário', subtitle: 'Registrar algo sobre o seu dia', onTap: () => Navigator.pop(context, 'journal')),
-            _QuickActionTile(icon: Icons.schedule_outlined, title: 'Bloco de rotina', subtitle: 'Planejar um período de tempo', onTap: () => Navigator.pop(context, 'routine')),
-            _QuickActionTile(icon: Icons.sports_esports_outlined, title: 'Hobby', subtitle: 'Acompanhar tempo de uma atividade', onTap: () => Navigator.pop(context, 'hobby')),
-            _QuickActionTile(icon: Icons.school_outlined, title: 'Sessão de estudo', subtitle: 'Registrar tempo e assunto estudado', onTap: () => Navigator.pop(context, 'study')),
-            _QuickActionTile(icon: Icons.restaurant_outlined, title: 'Consumo alimentar', subtitle: 'Registrar o que realmente consumiu', onTap: () => Navigator.pop(context, 'nutrition')),
-            _QuickActionTile(icon: Icons.repeat_outlined, title: 'Obrigação recorrente', subtitle: 'Configurar uma necessidade que se repete', onTap: () => Navigator.pop(context, 'obligation')),
-            ]),
-          ),
-        ),
-      ),
-    );
-    if (!mounted || choice == null) return;
+  Set<int> _parseActiveDays(Object? raw) {
+    if (raw is! String || raw.trim().isEmpty) return const <int>{};
     try {
-      switch (choice) {
-        case 'task':
-          await showAddTodayTaskDialog(context, ref);
-          break;
-        case 'goal':
-          await showGoalEditor(context, ref);
-          break;
-        case 'note':
-          await showNoteEditor(context, ref);
-          break;
-        case 'journal':
-          await showJournalEditor(context, ref, DateTime.now());
-          break;
-        case 'routine':
-          await showRoutineEditor(context, ref);
-          break;
-        case 'hobby':
-          await showHobbyEditor(context, ref);
-          break;
-        case 'study':
-          await _openPage(const StudyPage());
-          break;
-        case 'nutrition':
-          await _openPage(const NutritionPage());
-          break;
-        case 'obligation':
-          await _openPage(const ObligationsPage());
-          break;
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .whereType<num>()
+            .map((value) => value.toInt())
+            .where((value) => value >= 1 && value <= 7)
+            .toSet();
       }
+    } on FormatException {
+      // A malformed preference must not break the Home; fall back to every day.
+    }
+    return const <int>{};
+  }
+
+  // -------------------------------------------------------------------------
+  // Actions
+  // -------------------------------------------------------------------------
+
+  Future<void> _openCalendar({String? entryId}) =>
+      _openPage(CalendarPage(initialDate: _now, initialEntryId: entryId));
+
+  Future<void> _openEntry(HomeAgendaItem item) =>
+      _openCalendar(entryId: item.entry.id);
+
+  Future<void> _planDay() async {
+    try {
+      await showRoutineEditor(
+        context,
+        ref,
+        initialDate: _now,
+        initialStartMinute: _overview?.suggestedBlockStart ?? 9 * 60,
+        initialBlockKind: 'date',
+      );
       await _load();
     } catch (error) {
       if (mounted) showOrvaError(context, error);
     }
   }
 
-  Future<void> _editFocus() async {
-    final controller = TextEditingController(text: _focus ?? '');
-    final repo = ref.read(repositoryProvider);
-    final value = await showDialog<String?>(context: context, builder: (dialogContext) => AlertDialog(
-      title: const Text('Foco do dia'),
-      content: TextField(controller: controller, autofocus: true, maxLength: 120, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Prioridade opcional', hintText: 'Qual é o ponto mais importante de hoje?')),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
-        TextButton(onPressed: () => Navigator.pop(dialogContext, ''), child: const Text('Limpar')),
-        FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Salvar')),
-      ],
-    ));
-    controller.dispose();
-    if (value == null || !mounted) return;
-    final key = 'focus_${repo.dateKey(DateTime.now())}';
-    if (value.isEmpty) {
-      await repo.execute('DELETE FROM settings WHERE setting_key=?', [key]);
-    } else {
-      await repo.setSetting(key, value);
+  Future<void> _addTask() async {
+    try {
+      await showAddTodayTaskDialog(context, ref);
+      await _load();
+    } catch (error) {
+      if (mounted) showOrvaError(context, error);
     }
-    await _load();
   }
+
+  Future<void> _toggleChecklistItem(Map<String, Object?> item) async {
+    final id = item['id'] as String?;
+    if (id == null) return;
+    try {
+      await ref
+          .read(repositoryProvider)
+          .setOccurrenceItemCompleted(id, intValue(item['completed']) != 1);
+      await _load();
+    } catch (error) {
+      if (mounted) showOrvaError(context, error);
+    }
+  }
+
+  Future<void> _handleQuickAction(HomeQuickAction action) async {
+    switch (action) {
+      case HomeQuickAction.block:
+        await _planDay();
+      case HomeQuickAction.task:
+        await _addTask();
+      case HomeQuickAction.execution:
+        try {
+          await showExecutionEditor(context, ref);
+          await _load();
+        } catch (error) {
+          if (mounted) showOrvaError(context, error);
+        }
+      case HomeQuickAction.habit:
+        await _logHabit();
+      case HomeQuickAction.calendar:
+        await _openCalendar();
+    }
+  }
+
+  Future<void> _logHabit() async {
+    if (_habitRecords.isEmpty) {
+      await _openPage(const HabitsPage());
+      return;
+    }
+    final selected = await showModalBottomSheet<HabitRecord>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Registrar hábito',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'O valor substitui o registro de hoje.',
+                style: Theme.of(sheetContext).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              for (final habit in _habitRecords)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(
+                    Icons.repeat_rounded,
+                    color: OrvaColors.terracotta,
+                  ),
+                  title: Text(habit.name),
+                  subtitle: Text(_todayHabitLabel(habit)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pop(sheetContext, habit),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+
+    final signalIndex = _habits.signals.indexWhere(
+      (signal) => signal.habit.id == selected.id,
+    );
+    final current = signalIndex == -1
+        ? 0.0
+        : _habits.signals[signalIndex].todayQuantity;
+    final controller = TextEditingController(
+      text: _formatQuantity(current > 0 ? current : (selected.target ?? 1)),
+    );
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Registrar ${selected.name}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: selected.unit),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    final raw = controller.text.trim().replaceAll(',', '.');
+    controller.dispose();
+    if (saved != true || !mounted) return;
+
+    final quantity = double.tryParse(raw);
+    if (quantity == null || !quantity.isFinite || quantity < 0) {
+      showOrvaMessage(context, 'Informe uma quantidade válida.');
+      return;
+    }
+    try {
+      await ref
+          .read(repositoryProvider)
+          .logHabit(habitId: selected.id, date: _now, quantity: quantity);
+      await _load();
+    } catch (error) {
+      if (mounted) showOrvaError(context, error);
+    }
+  }
+
+  String _todayHabitLabel(HabitRecord habit) {
+    final index = _habits.signals.indexWhere(
+      (signal) => signal.habit.id == habit.id,
+    );
+    if (index == -1) return 'Sem registro nesta semana';
+    final signal = _habits.signals[index];
+    final value = _formatQuantity(signal.todayQuantity);
+    if (!signal.isTodayEligible) return 'Fora dos dias ativos hoje';
+    if (signal.todayQuantity <= 0) return 'Ainda sem registro hoje';
+    return '$value ${habit.unit} hoje';
+  }
+
+  // -------------------------------------------------------------------------
+  // Build
+  // -------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     final nameState = ref.watch(userNameProvider);
     final currentName = nameState.hasValue ? nameState.value : _userName;
-    final now = _now;
-    final date = DateFormat('EEEE, d MMMM', 'pt_BR').format(now);
-    final greeting = greetingForHour(now.hour);
-    final name = currentName == null || currentName.isEmpty ? '' : ', $currentName';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.small(
-        heroTag: 'home-quick-action',
-        onPressed: _quickAction,
-        tooltip: 'Criar algo novo',
-        backgroundColor: OrvaColors.primary,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _load,
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-                  ? ListView(children: [OrvaEmptyState(icon: Icons.error_outline, title: 'Não foi possível carregar', message: _error!, actionLabel: 'Tentar novamente', onAction: _load)])
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
-                      children: [
-                        Row(children: [
-                          Container(width: 42, height: 42, decoration: BoxDecoration(color: OrvaColors.primary, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.spa_outlined, color: Colors.white, size: 24)),
-                          const SizedBox(width: 10),
-                          Text('orva', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, letterSpacing: -0.8)),
-                          const Spacer(),
-                          IconButton(tooltip: 'Mais opções', onPressed: () => widget.onNavigate(3), icon: const Icon(Icons.tune_rounded)),
-                        ]),
-                        const SizedBox(height: 28),
-                        Text(greeting + name, style: Theme.of(context).textTheme.displaySmall),
-                        const SizedBox(height: 6),
-                        Text(_capitalize(date), style: Theme.of(context).textTheme.bodyMedium),
-                        const SizedBox(height: 28),
-                        _FocusCard(focus: _focus, onEditFocus: _editFocus),
-                        const SizedBox(height: 26),
-                        OrvaSectionHeader(title: 'Seu dia, em números'),
-                        const SizedBox(height: 12),
-                        _ProgressSummary(summary: _summary),
-                        const SizedBox(height: 28),
-                        OrvaSectionHeader(title: 'Checklist de hoje', actionLabel: 'Ver todos', onAction: () => widget.onNavigate(1)),
-                        const SizedBox(height: 12),
-                        if (_items.isEmpty)
-                          const OrvaSurface(child: OrvaEmptyState(icon: Icons.checklist_rounded, title: 'O dia está em aberto', message: 'Crie um checklist e escolha o que deseja concluir hoje.', compact: true))
-                        else
-                          OrvaSurface(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Column(children: [
-                              for (var i = 0; i < _items.length; i++) ...[
-                                _HomeChecklistItem(item: _items[i], onChanged: (checked) async {
-                                  await ref.read(repositoryProvider).setOccurrenceItemCompleted(_items[i]['id'] as String, checked);
-                                  await _load();
-                                }),
-                                if (i < _items.length - 1) const Divider(height: 1, indent: 54, endIndent: 14),
-                              ],
-                              if ((_summary['checklistTotal'] as int? ?? 0) > _items.length)
-                                Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12), child: Align(alignment: Alignment.centerLeft, child: Text('Mais ${(_summary['checklistTotal'] as int) - _items.length} itens no checklist', style: Theme.of(context).textTheme.bodySmall))),
-                            ]),
-                          ),
-                        const SizedBox(height: 28),
-                        OrvaSectionHeader(title: 'Metas ativas', actionLabel: 'Ver metas', onAction: () => widget.onNavigate(2)),
-                        const SizedBox(height: 12),
-                        if (_goals.isEmpty)
-                          OrvaSurface(child: OrvaEmptyState(icon: Icons.flag_outlined, title: 'Ainda sem metas', message: 'Defina o que você quer construir, no seu ritmo.', actionLabel: 'Criar minha primeira meta', onAction: () async { await showGoalEditor(context, ref); await _load(); }, compact: true))
-                        else
-                          ..._goals.map((goal) => Padding(padding: const EdgeInsets.only(bottom: 10), child: _GoalMiniCard(goal: goal, isDark: isDark, onTap: () => widget.onNavigate(2)))),
-                        const SizedBox(height: 18),
-                        OrvaSectionHeader(title: 'Rotina de hoje', actionLabel: 'Abrir rotina', onAction: () => _openPage(const RoutinePage())),
-                        const SizedBox(height: 12),
-                        if (_routine.isEmpty)
-                          OrvaSurface(child: OrvaEmptyState(icon: Icons.schedule_outlined, title: 'Sem blocos planejados', message: 'Organize o tempo do dia com atividades e horários definidos.', actionLabel: 'Adicionar atividade', onAction: () async { await showRoutineEditor(context, ref); await _load(); }, compact: true))
-                        else
-                          OrvaSurface(padding: const EdgeInsets.all(16), child: Column(children: [
-                            for (var i = 0; i < _routine.take(3).length; i++) ...[
-                              _RoutineMiniRow(block: _routine[i]),
-                              if (i < _routine.take(3).length - 1) const SizedBox(height: 16),
-                            ],
-                          ])),
-                        const SizedBox(height: 28),
-                        OrvaSectionHeader(title: 'Tempo planejado', actionLabel: 'Ver rotina', onAction: () => _openPage(const RoutinePage())),
-                        const SizedBox(height: 12),
-                        _TimeSummaryCard(summary: _summary, isDark: isDark),
-                        const SizedBox(height: 12),
-                        _DayAllocationCard(summary: _summary, routine: _routine),
-                        const SizedBox(height: 28),
-                        OrvaSectionHeader(title: 'Hobbies nesta semana', actionLabel: 'Ver hobbies', onAction: () => _openPage(const HobbiesPage())),
-                        const SizedBox(height: 12),
-                        if (_hobbies.isEmpty)
-                          const OrvaSurface(child: OrvaEmptyState(icon: Icons.sports_esports_outlined, title: 'Seu tempo livre também importa', message: 'Registre hobbies para acompanhar o tempo que realmente dedica a eles.', compact: true))
-                        else
-                          OrvaSurface(child: Column(children: [
-                            for (var i = 0; i < _hobbies.length; i++) ...[
-                              _HobbyMiniRow(hobby: _hobbies[i]),
-                              if (i < _hobbies.length - 1) const Divider(height: 22),
-                            ],
-                          ])),
-                        const SizedBox(height: 28),
-                        const _DailyQuoteCard(),
-                      ],
-                    ),
-        ),
-      ),
-    );
-  }
-}
+    final quotesEnabled =
+        ref.watch(quotesEnabledProvider).asData?.value ?? true;
+    final overview = _overview;
 
-String _capitalize(String value) => value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
-
-class _FocusCard extends StatelessWidget {
-  const _FocusCard({required this.focus, required this.onEditFocus});
-  final String? focus;
-  final VoidCallback onEditFocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasFocus = focus?.trim().isNotEmpty == true;
-    return OrvaSurface(
-      color: Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF24332F)
-          : OrvaColors.primary900,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            const Icon(Icons.spa_outlined, color: Color(0xFFB9D6D0), size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'FOCO DO DIA',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: const Color(0xFFB9D6D0),
-                    letterSpacing: 1.2,
-                    fontSize: 11,
-                  ),
+    Widget body;
+    if (_loading && overview == null) {
+      body = const _HomeScaffold(child: HomeSkeleton());
+    } else if (_error != null) {
+      body = _HomeScaffold(
+        child: ListView(
+          children: [
+            OrvaEmptyState(
+              icon: Icons.cloud_off_rounded,
+              title: 'Não foi possível carregar',
+              message: _error!,
+              actionLabel: 'Tentar novamente',
+              onAction: _load,
             ),
-          ]),
-          const SizedBox(height: 12),
-          Text(
-            hasFocus
-                ? focus!.trim()
-                : 'Qual é a principal coisa que você quer realizar hoje?',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                  fontSize: 22,
-                ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            hasFocus
-                ? 'Seu foco principal para hoje. Você pode ajustá-lo a qualquer momento.'
-                : 'Escolha uma prioridade que faça sentido para você. O foco é opcional.',
-            style: const TextStyle(color: Color(0xFFD7E4E1), height: 1.45),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onEditFocus,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE6F0ED),
-                foregroundColor: OrvaColors.primary900,
-                minimumSize: const Size(0, 46),
-              ),
-              icon: Icon(hasFocus ? Icons.edit_outlined : Icons.flag_outlined),
-              label: Text(hasFocus ? 'Editar foco' : 'Definir foco'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProgressSummary extends StatelessWidget {
-  const _ProgressSummary({required this.summary});
-  final Map<String, Object?> summary;
-  @override
-  Widget build(BuildContext context) {
-    final done = intValue(summary['checklistCompleted']);
-    final total = intValue(summary['checklistTotal']);
-    final progress = summary['checklistProgress'] as double?;
-    return Row(children: [
-      Expanded(child: OrvaSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.check_circle_outline_rounded, color: OrvaColors.success, size: 22),
-        const SizedBox(height: 12),
-        Text(progress == null ? '—' : '${(progress * 100).round()}%', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 25)),
-        const SizedBox(height: 3),
-        Text(progress == null ? 'Sem itens hoje' : '$done de $total concluídos', style: Theme.of(context).textTheme.bodySmall),
-        if (progress != null) ...[
-          const SizedBox(height: 10),
-          ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: progress, minHeight: 5, backgroundColor: OrvaColors.primary100, color: OrvaColors.primary)),
-        ],
-      ]))),
-      const SizedBox(width: 10),
-      Expanded(child: OrvaSurface(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.flag_outlined, color: OrvaColors.terracotta, size: 22),
-        const SizedBox(height: 12),
-        Text('${intValue(summary['activeGoals'])}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 25)),
-        const SizedBox(height: 3),
-        Text('metas ativas', style: Theme.of(context).textTheme.bodySmall),
-      ]))),
-    ]);
-  }
-}
-
-class _HomeChecklistItem extends StatelessWidget {
-  const _HomeChecklistItem({required this.item, required this.onChanged});
-  final Map<String, Object?> item;
-  final ValueChanged<bool> onChanged;
-  @override
-  Widget build(BuildContext context) {
-    final checked = intValue(item['completed']) == 1;
-    return CheckboxListTile(
-      value: checked,
-      onChanged: (value) => onChanged(value ?? false),
-      dense: true,
-      controlAffinity: ListTileControlAffinity.leading,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-      title: Text('${item['title_snapshot'] ?? ''}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(decoration: checked ? TextDecoration.lineThrough : null, color: checked ? OrvaColors.tertiaryText : null)),
-      subtitle: Text('${item['checklist_title'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
-      activeColor: OrvaColors.primary,
-    );
-  }
-}
-
-class _GoalMiniCard extends StatelessWidget {
-  const _GoalMiniCard({required this.goal, required this.isDark, required this.onTap});
-  final Map<String, Object?> goal;
-  final bool isDark;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    final progress = doubleValue(goal['progress_value']).clamp(0, 100) / 100;
-    return OrvaSurface(onTap: onTap, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(child: Text('${goal['title']}', style: Theme.of(context).textTheme.titleMedium)),
-        Text('${(progress * 100).round()}%', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700, color: OrvaColors.primary)),
-      ]),
-      if ((goal['category'] as String?)?.isNotEmpty == true) ...[const SizedBox(height: 4), Text('${goal['category']}', style: Theme.of(context).textTheme.bodySmall)],
-      const SizedBox(height: 12),
-      ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(value: progress, minHeight: 5, color: OrvaColors.primary, backgroundColor: isDark ? OrvaColors.darkBorder : OrvaColors.primary100)),
-      if (goal['deadline'] != null) ...[const SizedBox(height: 7), Text('Prazo: ${goal['deadline']}', style: Theme.of(context).textTheme.bodySmall)],
-    ]));
-  }
-}
-
-class _RoutineMiniRow extends StatelessWidget {
-  const _RoutineMiniRow({required this.block});
-  final Map<String, Object?> block;
-  @override
-  Widget build(BuildContext context) {
-    final start = intValue(block['start_minute']);
-    final end = intValue(block['end_minute']);
-    final now = DateTime.now();
-    final current = now.hour * 60 + now.minute;
-    final isCurrent = current >= start && current < end;
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SizedBox(width: 62, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(formatClock(start), style: const TextStyle(fontFeatures: [], fontFamily: 'monospace', fontSize: 13, fontWeight: FontWeight.w700)),
-        Text(formatClock(end), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace')),
-      ])),
-      Container(width: 3, height: 42, decoration: BoxDecoration(color: isCurrent ? OrvaColors.terracotta : OrvaColors.information, borderRadius: BorderRadius.circular(4))),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${block['title']}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500)),
-        const SizedBox(height: 3),
-        Text('${block['category'] ?? 'Sem categoria'} · ${formatMinutes(end - start)} planejados', style: Theme.of(context).textTheme.bodySmall),
-      ])),
-      if (isCurrent) const Icon(Icons.circle, color: OrvaColors.terracotta, size: 8),
-    ]);
-  }
-}
-
-class _TimeSummaryCard extends StatelessWidget {
-  const _TimeSummaryCard({required this.summary, required this.isDark});
-  final Map<String, Object?> summary;
-  final bool isDark;
-  @override
-  Widget build(BuildContext context) {
-    final blocks = intValue(summary['routineBlocks']);
-    final minutes = intValue(summary['plannedMinutes']);
-    if (blocks == 0 || minutes == 0) {
-      return const OrvaSurface(child: OrvaEmptyState(icon: Icons.timelapse_outlined, title: 'Sem tempo planejado ainda', message: 'Adicione blocos à rotina para visualizar a distribuição do seu dia.', compact: true));
-    }
-    return OrvaSurface(child: Row(children: [
-      Container(width: 46, height: 46, decoration: BoxDecoration(color: isDark ? const Color(0xFF2B3941) : const Color(0xFFE5EEF4), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.timelapse_outlined, color: OrvaColors.information)),
-      const SizedBox(width: 14),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(formatMinutes(minutes), style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 3),
-        Text('Tempo planejado em $blocks ${blocks == 1 ? 'bloco' : 'blocos'} hoje. Isso não representa tempo efetivamente realizado.', style: Theme.of(context).textTheme.bodySmall),
-      ])),
-    ]));
-  }
-}
-
-
-/// Wall-clock planning overview. Does not claim activities were completed.
-class _DayAllocationCard extends StatelessWidget {
-  const _DayAllocationCard({required this.summary, required this.routine});
-  final Map<String, Object?> summary;
-  final List<Map<String, Object?>> routine;
-
-  @override
-  Widget build(BuildContext context) {
-    if (routine.isEmpty) {
-      return const OrvaSurface(
-        child: OrvaEmptyState(
-          icon: Icons.donut_large_outlined,
-          title: 'Ainda não há horários planejados',
-          message: 'Adicione blocos à rotina para visualizar a ocupação e as horas não definidas.',
-          compact: true,
+          ],
         ),
       );
-    }
-
-    final occupied = intValue(summary['plannedMinutes']).clamp(0, 1440).toInt();
-    final free = 1440 - occupied;
-    final raw = summary['plannedCategories'];
-    final categories = raw is Map<String, int> ? raw : <String, int>{};
-    final scheme = Theme.of(context).colorScheme;
-    final colors = [
-      OrvaColors.primary,
-      OrvaColors.information,
-      OrvaColors.terracotta,
-      OrvaColors.mustard,
-      OrvaColors.success,
-      const Color(0xFF8B6B9E),
-    ];
-
-    final ring = SizedBox(
-      width: 154,
-      height: 154,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox.expand(
-            child: CustomPaint(
-              painter: _DailyRingPainter(
-                minutes: categories.values.toList(),
-                colors: colors,
-                freeMinutes: free,
-                emptyColor: scheme.surfaceContainerHighest,
-              ),
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${(occupied / 1440 * 100).round()}%',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              Text(
-                '${formatMinutes(occupied)} planejadas',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-
-    final categoryTiles = categories.entries.toList().asMap().entries.map((entry) {
-      final category = entry.value;
-      final related = routine.where((block) =>
-        ((block['category'] as String?)?.trim().isNotEmpty == true
-            ? block['category']
-            : 'Sem categoria') == category.key).toList();
-
-      return ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        leading: CircleAvatar(
-          radius: 6,
-          backgroundColor: colors[entry.key % colors.length],
-        ),
-        title: Text(
-          category.key,
-          style: Theme.of(context).textTheme.bodyLarge,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Text(
-          formatMinutes(category.value),
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        children: related.map((block) => ListTile(
-          dense: true,
-          title: Text('${block['title']}'),
-          subtitle: Text(
-            '${_homeClock(intValue(block['start_minute']))}–${_homeClock(intValue(block['end_minute']))} · horário planejado',
-          ),
-        )).toList(),
-      );
-    }).toList();
-
-    return OrvaSurface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Ocupação das 24 horas',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Planejamento · horários sobrepostos contados uma única vez.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth >= 500) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ring,
-                    const SizedBox(width: 18),
-                    Expanded(
+    } else if (overview == null) {
+      body = const _HomeScaffold(child: HomeSkeleton());
+    } else {
+      body = _HomeScaffold(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final hasSecondary =
+                _items.isNotEmpty || overview.pendingObligations.isNotEmpty;
+            final wide = constraints.maxWidth >= 980 && hasSecondary;
+            final horizontal = constraints.maxWidth < 420 ? 18.0 : 24.0;
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              children: [
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: wide ? 1180 : 760),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontal,
+                        10,
+                        horizontal,
+                        96,
+                      ),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: categoryTiles,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          HomeTopBar(
+                            onOpenCalendar: _openCalendar,
+                            onOpenSettings: () => widget.onNavigate(3),
+                          ),
+                          const SizedBox(height: OrvaSpace.lg),
+                          HomeGreeting(
+                            greeting: greetingForHour(_now.hour),
+                            name: currentName,
+                            dateLabel: DateFormat(
+                              "EEEE, d 'de' MMMM",
+                              'pt_BR',
+                            ).format(_now),
+                            isWeekend: _now.weekday >= 6,
+                          ),
+                          const SizedBox(height: OrvaSpace.lg),
+                          if (wide)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 7,
+                                  child: _primaryColumn(
+                                    overview,
+                                    quotesEnabled: quotesEnabled,
+                                  ),
+                                ),
+                                const SizedBox(width: OrvaSpace.lg),
+                                Expanded(
+                                  flex: 5,
+                                  child: _secondaryColumn(overview),
+                                ),
+                              ],
+                            )
+                          else
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ..._primaryColumn(
+                                  overview,
+                                  quotesEnabled: quotesEnabled,
+                                ),
+                                const SizedBox(height: OrvaSpace.lg),
+                                ..._secondaryColumn(overview),
+                              ],
+                            ),
+                        ],
                       ),
                     ),
-                  ],
-                );
-              }
-
-              return Column(
-                children: [
-                  Center(child: ring),
-                  const SizedBox(height: 8),
-                  ...categoryTiles,
-                ],
-              );
-            },
-          ),
-          const Divider(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Tempo não definido',
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  ),
                 ),
-              ),
-              Text(formatMinutes(free), style: Theme.of(context).textTheme.titleMedium),
-            ],
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Horas livres não são interpretadas como improdutividade.',
-            style: Theme.of(context).textTheme.bodySmall,
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: SafeArea(
+        child: RefreshIndicator(onRefresh: _load, child: body),
+      ),
+    );
+  }
+
+  List<Widget> _primaryColumn(
+    HomeOverview overview, {
+    required bool quotesEnabled,
+  }) {
+    return [
+      HomeHero(
+        overview: overview,
+        checklist: _checklist,
+        onPlanDay: _planDay,
+        onAddTask: _addTask,
+        onOpenCalendar: _openCalendar,
+      ),
+      const SizedBox(height: 12),
+      HomeQuickActionBar(onAction: _handleQuickAction),
+      if (overview.hasEntries) ...[
+        const SizedBox(height: OrvaSpace.lg),
+        NextActivityCard(
+          item: _highlightedItem(overview),
+          nowMinute: overview.nowMinute,
+          onOpen: _openEntry,
+        ),
+        const SizedBox(height: OrvaSpace.lg),
+        DayTimelinePreview(
+          slots: overview.timeline,
+          nowMinute: overview.nowMinute,
+          onOpenCalendar: _openCalendar,
+          onOpenEntry: _openEntry,
+          onPlan: _planDay,
+        ),
+      ],
+      if (!overview.hasEntries && _checklist.total > 0) ...[
+        const SizedBox(height: OrvaSpace.lg),
+        PrioritiesCard(
+          items: _items,
+          obligations: overview.pendingObligations,
+          onToggleItem: _toggleChecklistItem,
+          onOpenChecklists: () => widget.onNavigate(1),
+          onOpenObligations: () =>
+              _openPage(ObligationsPage(initialDate: _now)),
+        ),
+      ],
+      if (quotesEnabled) ...[
+        const SizedBox(height: OrvaSpace.lg),
+        HomeReflectionCard(
+          quote: quoteOfTheDay(_now).text,
+          author: quoteOfTheDay(_now).author,
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _secondaryColumn(HomeOverview overview) {
+    final sections = <Widget>[];
+
+    final hasPriorities =
+        _items.isNotEmpty || overview.pendingObligations.isNotEmpty;
+    if (hasPriorities) {
+      sections.add(
+        PrioritiesCard(
+          items: _items,
+          obligations: overview.pendingObligations,
+          onToggleItem: _toggleChecklistItem,
+          onOpenChecklists: () => widget.onNavigate(1),
+          onOpenObligations: () =>
+              _openPage(ObligationsPage(initialDate: _now)),
+        ),
+      );
+    }
+
+    if (!_habits.isEmpty) {
+      if (sections.isNotEmpty)
+        sections.add(const SizedBox(height: OrvaSpace.lg));
+      sections.add(
+        HabitConsistencyCard(
+          report: _habits,
+          onOpen: () => _openPage(const HabitsPage()),
+        ),
+      );
+    }
+
+    if (_goals.isNotEmpty) {
+      if (sections.isNotEmpty)
+        sections.add(const SizedBox(height: OrvaSpace.lg));
+      sections.add(
+        GoalsCard(
+          goals: _goals,
+          onOpen: () => widget.onNavigate(2),
+          onCreate: () async {
+            await showGoalEditor(context, ref);
+            await _load();
+          },
+        ),
+      );
+    }
+
+    if (_study.hasEvidence) {
+      if (sections.isNotEmpty)
+        sections.add(const SizedBox(height: OrvaSpace.lg));
+      sections.add(
+        StudyEvidenceCard(
+          study: _study,
+          onOpen: () => _openPage(const ExecutionsPage()),
+        ),
+      );
+    }
+
+    if (sections.isEmpty && !overview.hasEntries) {
+      sections.add(
+        const HomeQuietState(
+          icon: Icons.insights_outlined,
+          message: 'Consistência, metas e estudo aparecem aqui assim que você registrar os primeiros dados.',
+        ),
+      );
+    }
+
+    return sections;
+  }
+
+  HomeAgendaItem? _highlightedItem(HomeOverview overview) {
+    if (overview.liveActivity != null) {
+      for (final item in overview.items) {
+        if (item.phase == HomeEntryPhase.live && !item.entry.isExecuted) {
+          return item;
+        }
+      }
+    }
+    if (overview.nextActivity != null) {
+      for (final item in overview.items) {
+        if (item.entry.id == overview.nextActivity!.id) return item;
+      }
+    }
+    return null;
+  }
+}
+
+class _HomeScaffold extends StatelessWidget {
+  const _HomeScaffold({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          constraints.maxWidth < 420 ? 18 : 24,
+          10,
+          constraints.maxWidth < 420 ? 18 : 24,
+          96,
+        ),
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: child,
+            ),
           ),
         ],
       ),
@@ -679,97 +669,7 @@ class _DayAllocationCard extends StatelessWidget {
   }
 }
 
-class _DailyRingPainter extends CustomPainter {
-  const _DailyRingPainter({required this.minutes, required this.colors, required this.freeMinutes, required this.emptyColor});
-  final List<int> minutes;
-  final List<Color> colors;
-  final int freeMinutes;
-  final Color emptyColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 9;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final paint = Paint()..style = PaintingStyle.stroke..strokeWidth = 16;
-    var angle = -math.pi / 2;
-    for (var i = 0; i < minutes.length; i++) {
-      final sweep = minutes[i] / 1440 * 2 * math.pi;
-      paint.color = colors[i % colors.length];
-      canvas.drawArc(rect, angle, sweep, false, paint);
-      angle += sweep;
-    }
-    paint.color = emptyColor;
-    canvas.drawArc(rect, angle, freeMinutes / 1440 * 2 * math.pi, false, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _DailyRingPainter oldDelegate) =>
-      oldDelegate.freeMinutes != freeMinutes ||
-      oldDelegate.emptyColor != emptyColor ||
-      !listEquals(oldDelegate.minutes, minutes);
-}
-
-String _homeClock(int minute) => '${(minute ~/ 60).toString().padLeft(2, '0')}:${(minute % 60).toString().padLeft(2, '0')}';
-
-class _HobbyMiniRow extends StatelessWidget {
-  const _HobbyMiniRow({required this.hobby});
-  final Map<String, Object?> hobby;
-  @override
-  Widget build(BuildContext context) {
-    final actual = intValue(hobby['actual_minutes']);
-    final target = hobby['weekly_target_minutes'] as num?;
-    final targetMinutes = target?.toInt();
-    final progress = target == null || target == 0 ? null : (actual / target.toDouble()).clamp(0.0, 1.0);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [Expanded(child: Text('${hobby['name']}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600))), Text(formatMinutes(actual), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: OrvaColors.terracotta, fontWeight: FontWeight.w700))]),
-      const SizedBox(height: 7),
-      if (progress != null && targetMinutes != null) ...[
-        ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: progress, minHeight: 5, color: OrvaColors.terracotta, backgroundColor: OrvaColors.terracottaLight)),
-        const SizedBox(height: 4),
-        Text('Meta semanal: ${formatMinutes(targetMinutes)}', style: Theme.of(context).textTheme.bodySmall),
-      ] else
-        Text('Tempo registrado nesta semana', style: Theme.of(context).textTheme.bodySmall),
-    ]);
-  }
-}
-
-class _QuickActionTile extends StatelessWidget {
-  const _QuickActionTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Container(width: 42, height: 42, decoration: BoxDecoration(color: OrvaColors.primary.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: OrvaColors.primary)),
-        title: Text(title, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: onTap,
-      );
-}
-
-/// Reflexão do dia: frase filosófica determinística, discreta, desativável
-/// nas Configurações. Não depende de internet.
-class _DailyQuoteCard extends ConsumerWidget {
-  const _DailyQuoteCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final enabled = ref.watch(quotesEnabledProvider).asData?.value ?? true;
-    if (!enabled) return const SizedBox.shrink();
-    final quote = quoteOfTheDay(DateTime.now());
-    return OrvaSurface(
-      color: Theme.of(context).brightness == Brightness.dark ? OrvaColors.darkSubtle : OrvaColors.subtle,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Reflexão do dia', style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 8),
-        Text('"${quote.text}"', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontStyle: FontStyle.italic)),
-        const SizedBox(height: 6),
-        Text('— ${quote.author}', style: Theme.of(context).textTheme.bodySmall),
-      ]),
-    );
-  }
+String _formatQuantity(double value) {
+  if (value == value.roundToDouble()) return value.round().toString();
+  return value.toStringAsFixed(1);
 }

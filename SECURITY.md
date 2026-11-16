@@ -21,10 +21,11 @@ Orva is a local-first personal organization app. Security is focused on protecti
 
 ## Backups
 
-- Backup format is versioned JSON (`orva_backup`, version 5).
+- Backup format is versioned JSON (`orva_backup`, version 6).
 - PIN hash, salt and lock flags are never exported.
 - Import validates format and version and applies replacement inside a transaction with rollback on failure.
-- Older backups (v3, v4) are upgraded in memory by adding empty collections for newly introduced tables.
+- Older backups (v3, v4, v5) are upgraded in memory by adding empty collections for newly introduced tables.
+- Comparison check-ins are included in exports like any other local record; they never leave the device through widgets, logs or notifications.
 
 ## Logging and diagnostics
 

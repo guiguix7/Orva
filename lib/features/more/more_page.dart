@@ -8,13 +8,14 @@ import '../countdowns/countdowns_page.dart';
 import '../executions/executions_page.dart';
 import '../journal/journal_page.dart';
 import '../notes/notes_page.dart';
-import '../routine/routine_page.dart';
+import '../calendar/calendar_page.dart';
 import '../studies/study_page.dart';
 import '../nutrition/nutrition_page.dart';
 import '../obligations/obligations_page.dart';
 import '../settings/settings_page.dart';
 import '../settings/developer_console_page.dart';
 import '../settings/categories_page.dart';
+import '../comparison/comparison_page.dart';
 import '../profile/profile_page.dart';
 import '../../core/widgets/orva_widgets.dart';
 
@@ -27,7 +28,7 @@ class MorePage extends StatelessWidget {
     const SizedBox(height: 6),
     Text('Outras áreas do seu espaço pessoal.', style: Theme.of(context).textTheme.bodyMedium),
     const SizedBox(height: 22),
-    _ModuleTile(icon: Icons.schedule_outlined, title: 'Rotina e tempo', subtitle: 'Planeje blocos e veja a distribuição por categoria.', tint: OrvaColors.information, onTap: () => _open(context, const RoutinePage())),
+    _ModuleTile(icon: Icons.calendar_month_outlined, title: 'Calendário e tempo', subtitle: 'Dia, semana e mês com timeline, conflitos e tempo livre.', tint: OrvaColors.information, onTap: () => _open(context, const CalendarPage())),
     const SizedBox(height: 10),
     _ModuleTile(icon: Icons.repeat_rounded, title: 'Obrigações recorrentes', subtitle: 'Necessidades fixas, ocorrências, sono noturno e exceções por data.', tint: OrvaColors.information, onTap: () => _open(context, const ObligationsPage())),
     const SizedBox(height: 10),
@@ -50,6 +51,8 @@ class MorePage extends StatelessWidget {
     _ModuleTile(icon: Icons.label_outline_rounded, title: 'Categorias', subtitle: 'Crie, renomeie e organize suas categorias personalizadas.', tint: OrvaColors.mustard, onTap: () => _open(context, const CategoriesPage())),
     const SizedBox(height: 10),
     _ModuleTile(icon: Icons.person_outline_rounded, title: 'Perfil', subtitle: 'Nome, data de nascimento, altura e histórico de peso.', tint: const Color(0xFF4A7A9E), onTap: () => _open(context, const ProfilePage())),
+    const SizedBox(height: 10),
+    _ModuleTile(icon: Icons.balance_outlined, title: 'Alter egos', subtitle: 'Compare Beto e Alfredo com critérios mensuráveis e período explícito.', tint: OrvaColors.primary, onTap: () => _open(context, const ComparisonPage())),
     const SizedBox(height: 10),
     _ModuleTile(icon: Icons.tune_rounded, title: 'Configurações', subtitle: 'Perfil local, tema e backup dos dados.', tint: OrvaColors.primary, onTap: () => _open(context, const SettingsPage())),
     if (kDebugMode) ...[
