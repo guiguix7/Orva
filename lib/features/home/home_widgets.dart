@@ -1045,7 +1045,7 @@ class DayTimelinePreview extends StatelessWidget {
                 )
               : Column(
                   children: [
-                    _buildRows(context, visible),
+                    ..._buildRows(context, visible),
                     if (hidden > 0)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 2, 8, 4),
@@ -1778,7 +1778,9 @@ class _GoalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (doubleValue(goal['progress_value']) / 100).clamp(0, 1);
+    final progress = (doubleValue(goal['progress_value']) / 100)
+        .clamp(0, 1)
+        .toDouble();
     final category = (goal['category'] as String?)?.trim();
     final deadline = (goal['deadline'] as String?)?.trim();
     return Column(

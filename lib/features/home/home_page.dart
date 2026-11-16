@@ -462,15 +462,23 @@ class _HomePageState extends ConsumerState<HomePage> {
                               children: [
                                 Expanded(
                                   flex: 7,
-                                  child: _primaryColumn(
-                                    overview,
-                                    quotesEnabled: quotesEnabled,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: _primaryColumn(
+                                      overview,
+                                      quotesEnabled: quotesEnabled,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: OrvaSpace.lg),
                                 Expanded(
                                   flex: 5,
-                                  child: _secondaryColumn(overview),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: _secondaryColumn(overview),
+                                  ),
                                 ),
                               ],
                             )

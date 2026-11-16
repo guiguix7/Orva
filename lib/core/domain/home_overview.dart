@@ -9,6 +9,7 @@
 library;
 
 import 'calendar_layout.dart';
+import 'calendar_layout.dart' as calendar_layout;
 
 /// Where an entry sits relative to the current local time.
 ///
@@ -94,10 +95,8 @@ final class HomeOverview {
       }
     }
 
-    final planned = _unionMinutes(entries, 0, 1440);
-    final executed = entries
-        .where((entry) => entry.isExecuted)
-        .fold<int>(0, (sum, entry) => sum + entry.durationMinutes);
+    final planned = calendar_layout.plannedMinutes(entries);
+    final executed = calendar_layout.executedMinutes(entries);
     final pendingObligations = items
         .where(
           (item) =>
@@ -119,7 +118,7 @@ final class HomeOverview {
       executedMinutes: executed,
       freeMinutes: 1440 - planned,
       remainingPlannedMinutes: _unionMinutes(entries, minute, 1440),
-      conflictCount: conflictCount(entries),
+      conflictCount: calendar_layout.conflictCount(entries),
       plannedBlockCount: entries.where((entry) => !entry.isExecuted).length,
       executionCount: entries.where((entry) => entry.isExecuted).length,
       pendingObligations: List.unmodifiable(pendingObligations),
@@ -179,16 +178,19 @@ final class HomeOverview {
     final planned = items.where((item) => item.isPlanned).toList()
       ..sort((a, b) => a.entry.startMinute.compareTo(b.entry.startMinute));
     final slots = <HomeTimelineSlot>[];
-    var cursor = 0;
+    int? cursor;
     for (final item in planned) {
-      if (item.entry.startMinute - cursor >= 120 &&
+      if (cursor != null &&
+          item.entry.startMinute - cursor >= 120 &&
           item.entry.endMinute > nowMinute) {
         slots.add(
           HomeGapSlot(startMinute: cursor, endMinute: item.entry.startMinute),
         );
       }
       slots.add(HomeEntrySlot(item));
-      if (item.entry.endMinute > cursor) cursor = item.entry.endMinute;
+      if (cursor == null || item.entry.endMinute > cursor) {
+        cursor = item.entry.endMinute;
+      }
     }
     for (final item in items.where((item) => !item.isPlanned)) {
       slots.add(HomeEntrySlot(item));
