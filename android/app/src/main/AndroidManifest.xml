@@ -26,6 +26,96 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Home-screen widgets. Every provider only renders the sanitized
+             snapshot published by Flutter; none of them opens the database. -->
+        <receiver
+            android:name=".widgets.TodayWidgetProvider"
+            android:exported="false"
+            android:label="@string/orva_widget_today_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/orva_widget_today_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.TasksWidgetProvider"
+            android:exported="false"
+            android:label="@string/orva_widget_tasks_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/orva_widget_tasks_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.ProgressWidgetProvider"
+            android:exported="false"
+            android:label="@string/orva_widget_progress_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/orva_widget_progress_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.ComparisonWidgetProvider"
+            android:exported="false"
+            android:label="@string/orva_widget_comparison_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/orva_widget_comparison_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.GoalsWidgetProvider"
+            android:exported="false"
+            android:label="@string/orva_widget_goals_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/orva_widget_goals_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.HabitsWidgetProvider"
+            android:exported="false"
+            android:label="@string/orva_widget_habits_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/orva_widget_habits_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.StudyWidgetProvider"
+            android:exported="false"
+            android:label="@string/orva_widget_study_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/orva_widget_study_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.AgendaWidgetProvider"
+            android:exported="false"
+            android:label="@string/orva_widget_agenda_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/orva_widget_agenda_info" />
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

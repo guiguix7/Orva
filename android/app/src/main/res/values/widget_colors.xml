@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="orva_widget_bg">#FAF7F2</color>
+    <color name="orva_widget_text">#2B2A28</color>
+    <color name="orva_widget_secondary">#6B6862</color>
+    <color name="orva_widget_border">#E8E2D8</color>
+    <color name="orva_widget_primary">#2F5D57</color>
+    <color name="orva_widget_primary_soft">#DCEAE7</color>
+    <color name="orva_widget_dark_bg">#16312E</color>
+    <color name="orva_widget_dark_text">#F0EBE3</color>
+    <color name="orva_widget_dark_secondary">#9FC0BA</color>
+    <color name="orva_widget_dark_badge">#23433E</color>
+    <color name="orva_widget_accent">#E0A93B</color>
+    <color name="orva_widget_terracotta">#C97B5A</color>
+</resources>

@@ -57,7 +57,8 @@ void main() {
       expect(overview.executedMinutes, 45);
       expect(overview.executionCoverage, closeTo(0.25, 0.0001));
       expect(overview.freeMinutes, 1440 - 180);
-      expect(overview.remainingPlannedMinutes, 120 + 60);
+      // 10:30–11:00 of the live block plus the 11:30–12:30 block.
+      expect(overview.remainingPlannedMinutes, 30 + 60);
       expect(overview.executionCount, 1);
       expect(overview.plannedBlockCount, 3);
     });
@@ -104,7 +105,9 @@ void main() {
           ),
         ],
       );
-      expect(day.pendingObligations.map((entry) => entry.title), ['Conta de luz']);
+      expect(day.pendingObligations.map((entry) => entry.title), [
+        'Conta de luz',
+      ]);
     });
 
     test('suggests a new block inside the first free window', () {
@@ -198,9 +201,7 @@ void main() {
 
     test('treats an empty weekday set as every day', () {
       final report = buildHabitReport(
-        habits: const [
-          HabitRecord(id: 'h1', name: 'Água', unit: 'copos'),
-        ],
+        habits: const [HabitRecord(id: 'h1', name: 'Água', unit: 'copos')],
         logsByHabit: {
           'h1': {'2026-11-15': 8},
         },

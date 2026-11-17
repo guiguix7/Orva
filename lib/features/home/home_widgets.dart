@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/domain/calendar_layout.dart';
 import '../../core/domain/home_overview.dart';
@@ -21,11 +22,6 @@ Color _hairline(BuildContext context) {
   );
 }
 
-Color _surfaceColor(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? OrvaColors.darkSurface
-    : OrvaColors.surface;
-
 TextStyle _micro(BuildContext context, {Color? color, double size = 10.5}) {
   final base = Theme.of(context).textTheme.bodySmall;
   return TextStyle(
@@ -33,7 +29,7 @@ TextStyle _micro(BuildContext context, {Color? color, double size = 10.5}) {
     height: 1.25,
     fontWeight: FontWeight.w700,
     letterSpacing: 1.5,
-    color: color ?? OrvaColors.tertiaryText,
+    color: color ?? base?.color,
     fontFamily: base?.fontFamily,
     fontFamilyFallback: base?.fontFamilyFallback,
   );
@@ -132,7 +128,7 @@ class HomeGreeting extends StatelessWidget {
                 dateLabel.toUpperCase(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: _micro(context, color: OrvaColors.secondaryText),
+                style: _micro(context),
               ),
             ),
           ],
@@ -145,7 +141,9 @@ class HomeGreeting extends StatelessWidget {
               if (hasName)
                 TextSpan(
                   text: ',\n${name!.trim()}',
-                  style: const TextStyle(color: OrvaColors.tertiaryText),
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                  ),
                 ),
             ],
           ),
@@ -277,37 +275,42 @@ class HomeHero extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 16),
-          Container(height: 1, color: Colors.white.withValues(alpha: 0.10)),
-          const SizedBox(height: 12),
-          if (checklist.total > 0)
-            _HeroChecklist(digest: checklist)
-          else
-            Row(
-              children: [
-                Icon(Icons.check_circle_outline, size: 15, color: faint),
-                const SizedBox(width: 7),
-                Expanded(
-                  child: Text(
-                    'Nenhuma tarefa para hoje',
-                    style: TextStyle(fontSize: 12.5, color: faint),
+          if (!openDay) ...[
+            const SizedBox(height: 16),
+            Container(height: 1, color: Colors.white.withValues(alpha: 0.10)),
+            const SizedBox(height: 12),
+            if (checklist.total > 0)
+              _HeroChecklist(digest: checklist)
+            else
+              Row(
+                children: [
+                  Icon(Icons.check_circle_outline, size: 15, color: faint),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      'Nenhuma tarefa para hoje',
+                      style: TextStyle(fontSize: 12.5, color: faint),
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: onAddTask,
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 36),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  TextButton(
+                    onPressed: onAddTask,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Adicionar',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                  child: const Text(
-                    'Adicionar',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
+                ],
+              ),
+          ],
         ],
       ),
     );
@@ -583,7 +586,7 @@ class _DayRibbon extends StatelessWidget {
           executed: executed,
           nowMinute: overview.nowMinute,
           trackColor: Colors.white.withValues(alpha: 0.10),
-          executionColor: Colors.white.withValues(alpha: 0.92),
+          executionColor: const Color(0xFFA8D5C8),
         ),
       ),
     );
@@ -627,7 +630,7 @@ class _DayRibbonPainter extends CustomPainter {
       final width = (segment.end - segment.start) / 1440 * size.width;
       if (width <= 0) continue;
       canvas.drawRect(
-        Rect.fromLTWH(left, size.height - 4, math.max(width, 1.5), 4),
+        Rect.fromLTWH(left, size.height - 3, math.max(width, 1.5), 3),
         Paint()..color = executionColor,
       );
     }
@@ -752,7 +755,7 @@ class NextActivityCard extends StatelessWidget {
                         style: orvaMonoStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w500,
-                          color: OrvaColors.tertiaryText,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
                         ),
                       ),
                     ],
@@ -1136,7 +1139,7 @@ class _TimelineRow extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: isPast
-                      ? OrvaColors.tertiaryText
+                      ? Theme.of(context).textTheme.bodySmall?.color
                       : Theme.of(context).textTheme.bodyLarge?.color,
                 ),
               ),
@@ -1168,7 +1171,9 @@ class _TimelineRow extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontSize: 14,
                       fontWeight: isLive ? FontWeight.w700 : FontWeight.w500,
-                      color: isPast ? OrvaColors.tertiaryText : null,
+                      color: isPast
+                          ? Theme.of(context).textTheme.bodySmall?.color
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1178,7 +1183,9 @@ class _TimelineRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontSize: 11.5,
-                      color: isPast ? OrvaColors.tertiaryText : null,
+                      color: isPast
+                          ? Theme.of(context).textTheme.bodySmall?.color
+                          : null,
                     ),
                   ),
                 ],
@@ -1229,7 +1236,7 @@ class _GapRow extends StatelessWidget {
               style: orvaMonoStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: OrvaColors.tertiaryText,
+                color: Theme.of(context).textTheme.bodySmall?.color,
               ),
             ),
           ),
@@ -1240,18 +1247,15 @@ class _GapRow extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: OrvaColors.tertiaryText.withValues(alpha: 0.45),
+                color: OrvaColors.tertiaryText.withValues(alpha: 0.75),
               ),
             ),
           ),
           Expanded(
             child: Text(
               'Tempo livre · ${formatMinutes(slot.minutes)}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-                color: OrvaColors.tertiaryText,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(fontSize: 12, fontStyle: FontStyle.italic),
             ),
           ),
         ],
@@ -1276,9 +1280,9 @@ class _NowMarker extends StatelessWidget {
             child: Text(
               formatClock(nowMinute),
               style: orvaMonoStyle(
-                fontSize: 10,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w700,
-                color: OrvaColors.terracotta,
+                color: Theme.of(context).textTheme.bodySmall?.color,
               ),
             ),
           ),
@@ -1577,7 +1581,7 @@ class HabitConsistencyCard extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 3),
                         child: Text(
-                          '${report.loggedDays} de ${report.eligibleDays} oportunidades nesta semana',
+                          '${report.loggedDays} de ${report.eligibleDays} oportunidades nos últimos 7 dias',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(fontSize: 11.5, height: 1.35),
                         ),
@@ -1590,7 +1594,7 @@ class HabitConsistencyCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    'Nenhum dia elegível nesta semana para os hábitos ativos.',
+                    'Nenhum dia elegível nos últimos 7 dias para os hábitos ativos.',
                     style: Theme.of(context).textTheme.bodySmall
                         ?.copyWith(fontSize: 12),
                   ),
@@ -1710,6 +1714,12 @@ class _WeekDots extends StatelessWidget {
   }
 }
 
+String _deadlineLabel(String raw) {
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return raw;
+  return DateFormat("d 'de' MMM", 'pt_BR').format(parsed);
+}
+
 String _formatQuantity(double value) {
   if (value == value.roundToDouble()) return value.round().toString();
   return value.toStringAsFixed(1);
@@ -1824,7 +1834,8 @@ class _GoalRow extends StatelessWidget {
           Text(
             [
               if (category != null && category.isNotEmpty) category,
-              if (deadline != null && deadline.isNotEmpty) 'prazo $deadline',
+              if (deadline != null && deadline.isNotEmpty)
+                'prazo ${_deadlineLabel(deadline)}',
             ].join(' · '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

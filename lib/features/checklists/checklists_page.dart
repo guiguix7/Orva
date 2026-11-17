@@ -160,14 +160,19 @@ class _ChecklistCard extends StatelessWidget {
       if (!isArchived && !isTemplate && hasToday) ...[
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: progress, minHeight: 5, color: OrvaColors.primary, backgroundColor: OrvaColors.primary100))), const SizedBox(width: 10), Text('$completedCount/${todayItems.length}', style: Theme.of(context).textTheme.bodySmall)])),
         const SizedBox(height: 7),
-        for (var i = 0; i < todayItems.length; i++) CheckboxListTile(
-          value: intValue(todayItems[i]['completed']) == 1,
-          onChanged: (value) => onToggleItem(todayItems[i], value ?? false),
-          dense: true, controlAffinity: ListTileControlAffinity.leading,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-          title: Text('${todayItems[i]['title_snapshot']}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(decoration: intValue(todayItems[i]['completed']) == 1 ? TextDecoration.lineThrough : null)),
-          subtitle: todayItems.length == 1 ? null : null,
-          activeColor: OrvaColors.primary,
+        for (var i = 0; i < todayItems.length; i++) Material(
+          // The card already paints its own background; a transparent Material
+          // keeps CheckboxListTile's ink splashes visible and satisfies the
+          // ListTile background assertion in current Flutter versions.
+          type: MaterialType.transparency,
+          child: CheckboxListTile(
+            value: intValue(todayItems[i]['completed']) == 1,
+            onChanged: (value) => onToggleItem(todayItems[i], value ?? false),
+            dense: true, controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+            title: Text('${todayItems[i]['title_snapshot']}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(decoration: intValue(todayItems[i]['completed']) == 1 ? TextDecoration.lineThrough : null)),
+            activeColor: OrvaColors.primary,
+          ),
         ),
       ] else ...[
         Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 14), child: Row(children: [
@@ -192,32 +197,81 @@ String _recurrenceLabel(Map<String, Object?> checklist) {
 }
 
 Future<void> showAddTodayTaskDialog(BuildContext context, WidgetRef ref) async {
-  final controller = TextEditingController();
-  final formKey = GlobalKey<FormState>();
-  await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+  // The dialog owns its controller so it survives the close animation; the
+  // previous top-level dispose could run while the route was still rebuilding.
+  final value = await showDialog<String>(
+    context: context,
+    builder: (_) => const _AddTaskDialog(),
+  );
+  final taskTitle = value?.trim() ?? '';
+  if (taskTitle.isEmpty) return;
+  try {
+    final repo = ref.read(repositoryProvider);
+    final date = repo.dateKey(DateTime.now());
+    final title = 'Tarefas avulsas · $date';
+    var list = await repo.getChecklists(includeTemplates: false);
+    final matches = list.where((item) => item['title'] == title && item['scheduled_date'] == date).toList();
+    Map<String, Object?>? checklist = matches.isEmpty ? null : matches.first;
+    if (checklist == null) {
+      await repo.saveChecklist(title: title, recurrence: 'once', scheduledDate: date);
+      list = await repo.getChecklists(includeTemplates: false);
+      checklist = list.firstWhere((item) => item['title'] == title && item['scheduled_date'] == date);
+    }
+    await repo.addChecklistItem(checklistId: checklist['id'] as String, title: taskTitle);
+    if (context.mounted) showOrvaMessage(context, 'Tarefa adicionada ao checklist de hoje.');
+  } catch (error) {
+    if (context.mounted) showOrvaError(context, error);
+  }
+}
+
+class _AddTaskDialog extends StatefulWidget {
+  const _AddTaskDialog();
+
+  @override
+  State<_AddTaskDialog> createState() => _AddTaskDialogState();
+}
+
+class _AddTaskDialogState extends State<_AddTaskDialog> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
     title: const Text('Adicionar tarefa de hoje'),
-    content: Form(key: formKey, child: TextFormField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'O que você precisa fazer?', hintText: 'Descreva uma ação concreta'), validator: (value) => value == null || value.trim().isEmpty ? 'Escreva a tarefa.' : null)),
-    actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')), FilledButton(onPressed: () async {
-      if (!formKey.currentState!.validate()) return;
-      try {
-        final repo = ref.read(repositoryProvider);
-        final date = repo.dateKey(DateTime.now());
-        final title = 'Tarefas avulsas · $date';
-        var list = await repo.getChecklists(includeTemplates: false);
-        final matches = list.where((item) => item['title'] == title && item['scheduled_date'] == date).toList();
-        Map<String, Object?>? checklist = matches.isEmpty ? null : matches.first;
-        if (checklist == null) {
-          await repo.saveChecklist(title: title, recurrence: 'once', scheduledDate: date);
-          list = await repo.getChecklists(includeTemplates: false);
-          checklist = list.firstWhere((item) => item['title'] == title && item['scheduled_date'] == date);
-        }
-        await repo.addChecklistItem(checklistId: checklist['id'] as String, title: controller.text);
-        if (dialogContext.mounted) Navigator.pop(dialogContext);
-        if (context.mounted) showOrvaMessage(context, 'Tarefa adicionada ao checklist de hoje.');
-      } catch (error) { if (dialogContext.mounted) showOrvaError(dialogContext, error); }
-    }, child: const Text('Adicionar'))],
-  ));
-  controller.dispose();
+    content: Form(
+      key: _formKey,
+      child: TextFormField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'O que você precisa fazer?',
+          hintText: 'Descreva uma ação concreta',
+        ),
+        validator: (value) => value == null || value.trim().isEmpty
+            ? 'Escreva a tarefa.'
+            : null,
+        onFieldSubmitted: (_) => _submit(),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Adicionar')),
+    ],
+  );
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(context, _controller.text.trim());
+  }
 }
 
 Future<bool?> showChecklistEditor(BuildContext context, WidgetRef ref, {Map<String, Object?>? checklist, bool asTemplate = false}) async {

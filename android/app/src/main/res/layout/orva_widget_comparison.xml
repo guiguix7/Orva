@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/orva_widget_background"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <include layout="@layout/widget_locked" />
+
+    <LinearLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:letterSpacing="0.08"
+            android:text="BETO VS ALFREDO"
+            android:textColor="@color/orva_widget_secondary"
+            android:textSize="9sp" />
+
+        <TextView
+            android:id="@+id/widget_comparison_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:text="Alfredo à frente"
+            android:textColor="@color/orva_widget_text"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_comparison_alfredo_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Alfredo"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/widget_comparison_alfredo_pct"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="75%"
+                android:textColor="@color/orva_widget_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/widget_comparison_alfredo_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="2dp"
+            android:max="100"
+            android:progress="0"
+            android:progressBackgroundTint="@color/orva_widget_primary_soft"
+            android:progressTint="@color/orva_widget_primary" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_comparison_beto_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Beto"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/widget_comparison_beto_pct"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="25%"
+                android:textColor="@color/orva_widget_terracotta"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/widget_comparison_beto_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="2dp"
+            android:max="100"
+            android:progress="0"
+            android:progressBackgroundTint="@color/orva_widget_primary_soft"
+            android:progressTint="@color/orva_widget_terracotta" />
+
+        <TextView
+            android:id="@+id/widget_comparison_evidence"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="3 de 6 critérios com evidência"
+            android:textColor="@color/orva_widget_secondary"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <include layout="@layout/widget_footer" />
+</LinearLayout>

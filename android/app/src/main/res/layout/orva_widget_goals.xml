@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/orva_widget_background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <include layout="@layout/widget_locked" />
+
+    <LinearLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:letterSpacing="0.08"
+            android:text="METAS ATIVAS"
+            android:textColor="@color/orva_widget_secondary"
+            android:textSize="9sp" />
+
+        <TextView
+            android:id="@+id/widget_goals_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:text="2 metas ativas"
+            android:textColor="@color/orva_widget_text"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/widget_goal_row_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/widget_goal_title_1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Treinar três vezes por semana"
+                    android:textColor="@color/orva_widget_text"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/widget_goal_pct_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="38%"
+                    android:textColor="@color/orva_widget_primary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/widget_goal_bar_1"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="5dp"
+                android:max="100"
+                android:progress="0"
+                android:progressBackgroundTint="@color/orva_widget_primary_soft"
+                android:progressTint="@color/orva_widget_primary" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_goal_row_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/widget_goal_title_2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Concluir o semestre com média acima de 8"
+                    android:textColor="@color/orva_widget_text"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/widget_goal_pct_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="62%"
+                    android:textColor="@color/orva_widget_primary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/widget_goal_bar_2"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="5dp"
+                android:max="100"
+                android:progress="0"
+                android:progressBackgroundTint="@color/orva_widget_primary_soft"
+                android:progressTint="@color/orva_widget_primary" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_goal_row_3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/widget_goal_title_3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Ler 12 livros no ano"
+                    android:textColor="@color/orva_widget_text"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/widget_goal_pct_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="25%"
+                    android:textColor="@color/orva_widget_primary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/widget_goal_bar_3"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="5dp"
+                android:max="100"
+                android:progress="0"
+                android:progressBackgroundTint="@color/orva_widget_primary_soft"
+                android:progressTint="@color/orva_widget_primary" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_goals_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Crie uma meta para acompanhar aqui."
+            android:textColor="@color/orva_widget_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <include layout="@layout/widget_footer" />
+</LinearLayout>

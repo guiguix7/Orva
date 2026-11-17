@@ -472,22 +472,24 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           if (compact) ...[
             navigation,
             const SizedBox(height: OrvaSpace.xs),
-            Row(
-              children: [
-                Expanded(child: selector),
-                const SizedBox(width: OrvaSpace.xs),
-                TextButton(
-                  onPressed: () => _goTo(DateTime.now()),
-                  child: const Text('Hoje'),
-                ),
-              ],
+            // The app bar already offers "voltar para hoje"; the segmented
+            // selector is scaled down so it cannot overflow on narrow phones.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: selector,
             ),
           ] else
             Row(
               children: [
                 Flexible(flex: 2, child: navigation),
                 const SizedBox(width: OrvaSpace.md),
-                selector,
+                Flexible(
+                  flex: 3,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: selector,
+                  ),
+                ),
                 const SizedBox(width: OrvaSpace.xs),
                 TextButton(
                   onPressed: () => _goTo(DateTime.now()),
@@ -959,77 +961,79 @@ class _DayTimelineState extends State<DayTimeline> {
           child: InkWell(
             borderRadius: BorderRadius.circular(OrvaRadius.xs),
             onTap: () => widget.onEntryTap(entry),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-              decoration: BoxDecoration(
-                color: entry.isExecuted
-                    ? Colors.transparent
-                    : OrvaCategoryPalette.soft(context, color),
-                borderRadius: BorderRadius.circular(OrvaRadius.xs),
-                border: Border(
-                  left: BorderSide(
-                    color: color,
-                    width: entry.isExecuted ? 1.5 : 3,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(OrvaRadius.xs),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                decoration: BoxDecoration(
+                  color: entry.isExecuted
+                      ? Colors.transparent
+                      : OrvaCategoryPalette.soft(context, color),
+                  border: Border(
+                    left: BorderSide(
+                      color: color,
+                      width: entry.isExecuted ? 1.5 : 3,
+                    ),
+                    top: entry.isExecuted
+                        ? BorderSide(color: color.withValues(alpha: 0.5))
+                        : BorderSide.none,
+                    right: entry.isExecuted
+                        ? BorderSide(color: color.withValues(alpha: 0.5))
+                        : BorderSide.none,
+                    bottom: entry.isExecuted
+                        ? BorderSide(color: color.withValues(alpha: 0.5))
+                        : BorderSide.none,
                   ),
-                  top: entry.isExecuted
-                      ? BorderSide(color: color.withValues(alpha: 0.5))
-                      : BorderSide.none,
-                  right: entry.isExecuted
-                      ? BorderSide(color: color.withValues(alpha: 0.5))
-                      : BorderSide.none,
-                  bottom: entry.isExecuted
-                      ? BorderSide(color: color.withValues(alpha: 0.5))
-                      : BorderSide.none,
                 ),
-              ),
-              child: ClipRect(
-                child: height < 34
-                    ? Text(
-                        entry.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
+                child: ClipRect(
+                  child: height < 42
+                      ? Text(
+                          entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.title,
+                              maxLines: height > 60 ? 2 : 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              entry.isExecuted
+                                  ? 'realizado · ${formatMinutes(entry.durationMinutes)}'
+                                  : '${formatClock(entry.startMinute)} – ${formatClock(entry.endMinute)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'JetBrainsMono',
+                                fontFamilyFallback: const [
+                                  'Roboto Mono',
+                                  'monospace',
+                                ],
+                                fontSize: 10,
+                                height: 1.2,
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.color,
+                              ),
+                            ),
+                          ],
                         ),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entry.title,
-                            maxLines: height > 60 ? 2 : 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              height: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            entry.isExecuted
-                                ? 'realizado · ${formatMinutes(entry.durationMinutes)}'
-                                : '${formatClock(entry.startMinute)} – ${formatClock(entry.endMinute)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'JetBrainsMono',
-                              fontFamilyFallback: const [
-                                'Roboto Mono',
-                                'monospace',
-                              ],
-                              fontSize: 10,
-                              height: 1.2,
-                              color: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.color,
-                            ),
-                          ),
-                        ],
-                      ),
+                ),
               ),
             ),
           ),

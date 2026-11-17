@@ -18,62 +18,26 @@ Future<bool?> showExecutionEditor(
   String initialCategory = '',
   int initialMinutes = 25,
 }) async {
-  final titleCtrl = TextEditingController(text: initialTitle);
-  final categoryCtrl = TextEditingController(text: initialCategory);
-  final minutesCtrl = TextEditingController(text: '$initialMinutes');
-  final ok = await showDialog<bool>(
+  // The dialog owns its controllers until the route is fully removed. Reading
+  // and disposing them immediately after `showDialog` could hit the exit
+  // animation in newer Flutter versions.
+  final draft = await showDialog<_ManualExecutionDraft>(
     context: context,
-    builder: (dialog) => AlertDialog(
-      title: const Text('Registrar execução manual'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: titleCtrl,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Título *'),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: categoryCtrl,
-            decoration: const InputDecoration(labelText: 'Categoria'),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: minutesCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Minutos'),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialog, false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialog, true),
-          child: const Text('Salvar'),
-        ),
-      ],
+    builder: (_) => _ManualExecutionDialog(
+      initialTitle: initialTitle,
+      initialCategory: initialCategory,
+      initialMinutes: initialMinutes,
     ),
   );
-  final rawTitle = titleCtrl.text.trim();
-  final rawCategory = categoryCtrl.text.trim();
-  final rawMinutes = minutesCtrl.text.trim();
-  titleCtrl.dispose();
-  categoryCtrl.dispose();
-  minutesCtrl.dispose();
-  if (ok != true) return false;
+  if (draft == null) return false;
   try {
-    final minutes = int.tryParse(rawMinutes) ?? 0;
     final now = DateTime.now();
     await ref
         .read(repositoryProvider)
         .saveExecution(
-          title: rawTitle,
-          category: rawCategory,
-          durationMinutes: minutes <= 0 ? 1 : minutes,
+          title: draft.title,
+          category: draft.category,
+          durationMinutes: draft.minutes <= 0 ? 1 : draft.minutes,
           startedAt: now,
           source: 'manual',
           referenceDate: now,
@@ -82,6 +46,95 @@ Future<bool?> showExecutionEditor(
   } catch (error) {
     if (context.mounted) showOrvaError(context, error);
     return false;
+  }
+}
+
+class _ManualExecutionDraft {
+  const _ManualExecutionDraft({
+    required this.title,
+    required this.category,
+    required this.minutes,
+  });
+
+  final String title;
+  final String category;
+  final int minutes;
+}
+
+class _ManualExecutionDialog extends StatefulWidget {
+  const _ManualExecutionDialog({
+    required this.initialTitle,
+    required this.initialCategory,
+    required this.initialMinutes,
+  });
+
+  final String initialTitle;
+  final String initialCategory;
+  final int initialMinutes;
+
+  @override
+  State<_ManualExecutionDialog> createState() => _ManualExecutionDialogState();
+}
+
+class _ManualExecutionDialogState extends State<_ManualExecutionDialog> {
+  late final _titleCtrl = TextEditingController(text: widget.initialTitle);
+  late final _categoryCtrl = TextEditingController(
+    text: widget.initialCategory,
+  );
+  late final _minutesCtrl = TextEditingController(
+    text: '${widget.initialMinutes}',
+  );
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _categoryCtrl.dispose();
+    _minutesCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Registrar execução manual'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _titleCtrl,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Título *'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _categoryCtrl,
+          decoration: const InputDecoration(labelText: 'Categoria'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _minutesCtrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Minutos'),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Salvar')),
+    ],
+  );
+
+  void _submit() {
+    Navigator.pop(
+      context,
+      _ManualExecutionDraft(
+        title: _titleCtrl.text.trim(),
+        category: _categoryCtrl.text.trim(),
+        minutes: int.tryParse(_minutesCtrl.text.trim()) ?? 0,
+      ),
+    );
   }
 }
 

@@ -47,9 +47,12 @@ Future<bool?> showRoutineEditor(
   final hobbies = await repo.getHobbies();
   if (!context.mounted) return false;
   final formKey = GlobalKey<FormState>();
+  ModalRoute<dynamic>? dialogRoute;
   final result = await showDialog<bool>(
     context: context,
-    builder: (dialogContext) => StatefulBuilder(
+    builder: (dialogContext) {
+      dialogRoute ??= ModalRoute.of(dialogContext);
+      return StatefulBuilder(
       builder: (context, setState) => AlertDialog(
         title: Text(
           block == null || duplicate ? 'Novo bloco de rotina' : 'Editar bloco',
@@ -277,12 +280,42 @@ Future<bool?> showRoutineEditor(
           ),
         ],
       ),
-    ),
+      );
+    },
   );
-  title.dispose();
-  category.dispose();
-  template.dispose();
+  _disposeAfterRoute(dialogRoute, [title, category, template]);
   return result;
+}
+
+/// Disposes dialog-only controllers once the route has fully left the tree.
+/// Immediate disposal after `showDialog` can race the exit animation in newer
+/// Flutter versions and trigger "controller used after being disposed".
+void _disposeAfterRoute(
+  ModalRoute<dynamic>? route,
+  List<TextEditingController> controllers,
+) {
+  void disposeAll() {
+    for (final controller in controllers) {
+      controller.dispose();
+    }
+  }
+
+  final animation = route?.animation;
+  if (route == null || animation == null) {
+    disposeAll();
+    return;
+  }
+  if (animation.status == AnimationStatus.dismissed) {
+    disposeAll();
+    return;
+  }
+  void listener(AnimationStatus status) {
+    if (status != AnimationStatus.dismissed) return;
+    animation.removeStatusListener(listener);
+    disposeAll();
+  }
+
+  animation.addStatusListener(listener);
 }
 
 Future<bool?> showRoutineTemplatesDialog(
@@ -439,44 +472,60 @@ Future<bool?> showRoutineTemplatesDialog(
   );
 }
 
-Future<String?> _askRoutineTemplateName(BuildContext context) async {
-  final controller = TextEditingController();
-  final formKey = GlobalKey<FormState>();
-  final result = await showDialog<String>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Salvar modelo semanal'),
-      content: Form(
-        key: formKey,
-        child: TextFormField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nome do modelo *',
-            hintText: 'Ex.: Semana de trabalho',
-          ),
-          validator: (value) =>
-              value == null || value.trim().isEmpty ? 'Informe um nome.' : null,
+Future<String?> _askRoutineTemplateName(BuildContext context) => showDialog<String>(
+  context: context,
+  builder: (_) => const _RoutineTemplateNameDialog(),
+);
+
+class _RoutineTemplateNameDialog extends StatefulWidget {
+  const _RoutineTemplateNameDialog();
+
+  @override
+  State<_RoutineTemplateNameDialog> createState() =>
+      _RoutineTemplateNameDialogState();
+}
+
+class _RoutineTemplateNameDialogState
+    extends State<_RoutineTemplateNameDialog> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Salvar modelo semanal'),
+    content: Form(
+      key: _formKey,
+      child: TextFormField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Nome do modelo *',
+          hintText: 'Ex.: Semana de trabalho',
         ),
+        validator: (value) =>
+            value == null || value.trim().isEmpty ? 'Informe um nome.' : null,
+        onFieldSubmitted: (_) => _submit(),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (formKey.currentState!.validate()) {
-              Navigator.pop(dialogContext, controller.text.trim());
-            }
-          },
-          child: const Text('Salvar'),
-        ),
-      ],
     ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Salvar')),
+    ],
   );
-  controller.dispose();
-  return result;
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(context, _controller.text.trim());
+  }
 }
 
 TimeOfDay _minuteToTime(int minute) =>

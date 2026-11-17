@@ -1,6 +1,6 @@
 # Feature Specification — Android Home-Screen Widgets
 
-Status: SPECIFIED / NOT IMPLEMENTED in the audited 2026-10-30 tree.
+Status: IMPLEMENTED / PARTIALLY VALIDATED. Eight providers and the Flutter snapshot pipeline exist; emulator smoke passed and the Today widget was validated with real populated data (task completed in-app, widget refreshed to "1 de 1 tarefas") on 2026-11-17, shipped in v2.1.0. Resize, reboot, lock-mode and populated states for the other seven widgets still need acceptance evidence.
 
 Priority: P1 — Urgent.
 
@@ -104,6 +104,16 @@ Before choosing a bridge, verify current pub.dev version, Flutter/Dart constrain
 10. Android build and emulator/device tests pass.
 11. Flutter-side data contract remains reusable for iOS.
 
-## 11. MVP exclusions
+## 11. Implementation notes (2026-11-16)
+
+- Eight widgets ship: Orva Hoje, Orva Tarefas, Orva Progresso, Orva Beto vs Alfredo, Orva Metas, Orva Hábitos, Orva Estudos and Orva Agenda (4×2 or 4×4).
+- Transport is a project-owned `MethodChannel` (`com.appguilherme.orva/widgets`) plus app-private `SharedPreferences`; no third-party widget package and no direct SQLite access from native code.
+- `lib/core/domain/widget_snapshot.dart` builds a versioned, bounded snapshot from Home/comparison/habit/study/goal projections. Notes, journal, finance, health and habit quantities are never included.
+- When the app lock is on, Flutter publishes a content-free protected snapshot; every layout shows a generic locked state.
+- Refresh runs on database readiness, app resume/pause and a 10-minute foreground timer. Providers show an honest "Atualizado …" label and mark snapshots older than 12 hours as outdated.
+- Native tap intents carry a validated route (`today`, `tasks`, `progress`, `comparison`, `goals`, `habits`, `study`, `agenda`); Flutter opens the matching destination after unlock. Task completion and other writes remain app-only.
+- Validation evidence: `flutter build apk --debug` passes; emulator API 37 registered all eight providers, wrote the snapshot, listed all widgets in the picker and rendered Orva Hoje on the launcher. See `screenshots/widgets-qa/`.
+
+## 12. MVP exclusions
 
 No arbitrary routine editing from launcher, no direct SQLite access from widget, no cloud push, no iOS widgets, and no sensitive comparison/health/vice/finance summaries.

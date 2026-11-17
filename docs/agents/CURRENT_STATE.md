@@ -22,7 +22,7 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 
 | Area | Evidence | Interpretation |
 |---|---|---|
-| Home | lib/features/home/home_page.dart | Daily summary/focus and linked data exist; inspect exact current behavior. |
+| Home | lib/features/home/home_page.dart, home_widgets.dart, lib/core/domain/home_overview.dart | Command center: planned vs executed time with a 24h ribbon, live/next activity, compact timeline with now marker, checklist and obligation priorities, rolling 7-day habit consistency, goals, study evidence and five quick actions wired to existing editors. Pure domain has unit tests; widget tests cover 390/430/768/1440, dark and empty states; browser QA evidence in screenshots/home-qa/. |
 | Checklists | lib/features/checklists/ and repository | Existing checklist/occurrence system; investigate reuse before creating missions. |
 | Goals | lib/features/goals/goals_page.dart | CRUD/status/history; inspected editor uses manual progress. |
 | Calendar | lib/features/calendar/, calendar_repository.dart, lib/core/domain/calendar_layout.dart | Day timeline, week and month views over routine blocks, obligations, meal plans and executions. Block editor and weekly templates live in lib/features/routine/routine_editor.dart. |
@@ -35,6 +35,7 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 | Notes / journal | lib/features/notes/ and lib/features/journal/ | Local notes and date-based journal. |
 | Countdown | lib/features/countdowns/ | Countdown surface. |
 | Alter egos | lib/features/comparison/, comparison_repository.dart, lib/core/domain/comparison_scoring.dart | Beto vs Alfredo MVP: editable traits, manual check-ins, habit/study-derived evidence, weighted score with coverage. Live projection, no snapshots yet. |
+| Android widgets | android/app/src/main/kotlin/com/appguilherme/orva/widgets/, android/app/src/main/res/layout/orva_widget_*.xml, lib/core/domain/widget_snapshot.dart, lib/core/platform/widget_bridge.dart, lib/core/platform/widget_sync.dart | Eight launcher widgets: Hoje, Tarefas, Progresso, Beto vs Alfredo, Metas, Hábitos, Estudos and Agenda. Flutter publishes a versioned, sanitized snapshot through a MethodChannel; native RemoteViews only render it and deep-link into the app. Protected snapshot when app lock is on. Emulator smoke passed; Today populated/refresh validated 2026-11-17 (v2.1.0); resize/reboot/lock and populated states for the other widgets pending. |
 | Profile | lib/features/profile/ | Local profile/body records; sensitive. |
 | Security | lib/features/security/ and lib/core/security/ | PIN/biometric code exists; this is not database encryption. |
 | Developer console | lib/features/settings/developer_console_page.dart | Debug diagnostics; review sanitization before adding logs. |
@@ -43,7 +44,7 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 
 - The day/week/month calendar now exists. Drag-and-drop move/resize and immutable history are still missing.
 - Goal progress in inspected editor is manual; complete aggregation from linked records was not established.
-- No production Android launcher widget implementation was found.
+- Android widgets are smoke-validated on an emulator and the Today widget was validated with populated data on 2026-11-17: completing a task in-app refreshed the widget to "1 de 1 tarefas" in v2.1.0. Resize, reboot, lock-mode rendering and populated states/tap destinations for the other seven widgets still need acceptance evidence.
 - Beto/Alfredo comparison exists as a v1 MVP (queries + UI + tests). Missing: immutable closed-period history, per-trait evidence history view, and any XP/analytics coupling.
 - A complete manual + record-derived recurring mission domain was not established. Existing checklists may be reusable but semantics must be reviewed.
 - No complete XP/level/achievement/prestige system was found.

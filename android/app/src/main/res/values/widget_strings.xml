@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="orva_widget_today_label">Orva Hoje</string>
+    <string name="orva_widget_today_description">Próxima atividade, tarefas e o pulso do seu dia.</string>
+
+    <string name="orva_widget_tasks_label">Orva Tarefas</string>
+    <string name="orva_widget_tasks_description">Tarefas pendentes do checklist de hoje.</string>
+
+    <string name="orva_widget_progress_label">Orva Progresso</string>
+    <string name="orva_widget_progress_description">Tempo planejado, executado e conclusão do checklist.</string>
+
+    <string name="orva_widget_comparison_label">Orva Beto vs Alfredo</string>
+    <string name="orva_widget_comparison_description">A comparação fixa entre Beto e Alfredo, baseada apenas em evidências.</string>
+
+    <string name="orva_widget_goals_label">Orva Metas</string>
+    <string name="orva_widget_goals_description">Suas metas ativas e o progresso registrado.</string>
+
+    <string name="orva_widget_habits_label">Orva Hábitos</string>
+    <string name="orva_widget_habits_description">Consistência dos hábitos nos últimos sete dias.</string>
+
+    <string name="orva_widget_study_label">Orva Estudos</string>
+    <string name="orva_widget_study_description">Minutos, sessões e revisões da semana.</string>
+
+    <string name="orva_widget_agenda_label">Orva Agenda</string>
+    <string name="orva_widget_agenda_description">Os próximos blocos planejados para hoje.</string>
+</resources>

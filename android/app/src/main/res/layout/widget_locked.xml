@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_locked"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:orientation="vertical"
+    android:gravity="center_vertical"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/widget_locked_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="Conteúdo protegido"
+        android:textColor="@color/orva_widget_text"
+        android:textSize="18sp" />
+
+    <TextView
+        android:id="@+id/widget_locked_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:lineSpacingExtra="2dp"
+        android:text="Abra o Orva para desbloquear."
+        android:textColor="@color/orva_widget_secondary"
+        android:textSize="12sp" />
+</LinearLayout>

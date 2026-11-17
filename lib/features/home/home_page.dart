@@ -24,6 +24,7 @@ import '../habits/habits_page.dart';
 import '../obligations/obligations_page.dart';
 import '../quotes/quotes_data.dart';
 import '../routine/routine_editor.dart';
+import '../studies/study_page.dart';
 import 'home_widgets.dart';
 
 /// Home = command center.
@@ -112,6 +113,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         day.month,
         day.day - (day.weekday - 1),
       );
+      // Rolling window: every habit is judged over the same seven local days,
+      // so a Monday does not produce a one-day "100%" consistency figure.
+      final habitWindowStart = DateTime(day.year, day.month, day.day - 6);
 
       final habitRows = await repo.getHabits();
       final habitRecords = <HabitRecord>[];
@@ -131,7 +135,11 @@ class _HomePageState extends ConsumerState<HomePage> {
             activeWeekdays: _parseActiveDays(row['active_days_json']),
           ),
         );
-        final logRows = await repo.getHabitLogs(id, from: weekStart, to: day);
+        final logRows = await repo.getHabitLogs(
+          id,
+          from: habitWindowStart,
+          to: day,
+        );
         logsByHabit[id] = {
           for (final log in logRows)
             if (log['log_date'] is String)
@@ -156,7 +164,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       final report = buildHabitReport(
         habits: habitRecords,
         logsByHabit: logsByHabit,
-        windowStart: weekStart,
+        windowStart: habitWindowStart,
         today: day,
       );
 
@@ -329,36 +337,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     final current = signalIndex == -1
         ? 0.0
         : _habits.signals[signalIndex].todayQuantity;
-    final controller = TextEditingController(
-      text: _formatQuantity(current > 0 ? current : (selected.target ?? 1)),
-    );
-    final saved = await showDialog<bool>(
+    final raw = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Registrar ${selected.name}'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: selected.unit),
+      builder: (_) => _HabitQuantityDialog(
+        habitName: selected.name,
+        unit: selected.unit,
+        initialValue: _formatQuantity(
+          current > 0 ? current : (selected.target ?? 1),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Salvar'),
-          ),
-        ],
       ),
     );
-    final raw = controller.text.trim().replaceAll(',', '.');
-    controller.dispose();
-    if (saved != true || !mounted) return;
+    if (raw == null || !mounted) return;
 
-    final quantity = double.tryParse(raw);
+    final quantity = double.tryParse(raw.trim().replaceAll(',', '.'));
     if (quantity == null || !quantity.isFinite || quantity < 0) {
       showOrvaMessage(context, 'Informe uma quantidade válida.');
       return;
@@ -402,107 +393,105 @@ class _HomePageState extends ConsumerState<HomePage> {
       body = const _HomeScaffold(child: HomeSkeleton());
     } else if (_error != null) {
       body = _HomeScaffold(
-        child: ListView(
-          children: [
-            OrvaEmptyState(
-              icon: Icons.cloud_off_rounded,
-              title: 'Não foi possível carregar',
-              message: _error!,
-              actionLabel: 'Tentar novamente',
-              onAction: _load,
-            ),
-          ],
+        child: OrvaEmptyState(
+          icon: Icons.cloud_off_rounded,
+          title: 'Não foi possível carregar',
+          message: _error!,
+          actionLabel: 'Tentar novamente',
+          onAction: _load,
         ),
       );
     } else if (overview == null) {
       body = const _HomeScaffold(child: HomeSkeleton());
     } else {
-      body = _HomeScaffold(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final hasSecondary =
-                _items.isNotEmpty || overview.pendingObligations.isNotEmpty;
-            final wide = constraints.maxWidth >= 980 && hasSecondary;
-            final horizontal = constraints.maxWidth < 420 ? 18.0 : 24.0;
-            return ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: wide ? 1180 : 760),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        horizontal,
-                        10,
-                        horizontal,
-                        96,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          HomeTopBar(
-                            onOpenCalendar: _openCalendar,
-                            onOpenSettings: () => widget.onNavigate(3),
-                          ),
-                          const SizedBox(height: OrvaSpace.lg),
-                          HomeGreeting(
-                            greeting: greetingForHour(_now.hour),
-                            name: currentName,
-                            dateLabel: DateFormat(
-                              "EEEE, d 'de' MMMM",
-                              'pt_BR',
-                            ).format(_now),
-                            isWeekend: _now.weekday >= 6,
-                          ),
-                          const SizedBox(height: OrvaSpace.lg),
-                          if (wide)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 7,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: _primaryColumn(
-                                      overview,
-                                      quotesEnabled: quotesEnabled,
-                                    ),
+      body = LayoutBuilder(
+        builder: (context, constraints) {
+          final hasSecondary =
+              _items.isNotEmpty ||
+              overview.pendingObligations.isNotEmpty ||
+              !_habits.isEmpty ||
+              _goals.isNotEmpty ||
+              _study.hasEvidence;
+          final wide = constraints.maxWidth >= 980 && hasSecondary;
+          final horizontal = constraints.maxWidth < 420 ? 18.0 : 24.0;
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: wide ? 1180 : 760),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontal,
+                      10,
+                      horizontal,
+                      96,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        HomeTopBar(
+                          onOpenCalendar: _openCalendar,
+                          onOpenSettings: () => widget.onNavigate(3),
+                        ),
+                        const SizedBox(height: OrvaSpace.lg),
+                        HomeGreeting(
+                          greeting: greetingForHour(_now.hour),
+                          name: currentName,
+                          dateLabel: DateFormat(
+                            "EEEE, d 'de' MMMM",
+                            'pt_BR',
+                          ).format(_now),
+                          isWeekend: _now.weekday >= 6,
+                        ),
+                        const SizedBox(height: OrvaSpace.lg),
+                        if (wide)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 7,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: _primaryColumn(overview),
+                                ),
+                              ),
+                              const SizedBox(width: OrvaSpace.lg),
+                              Expanded(
+                                flex: 5,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: _secondaryColumn(
+                                    overview,
+                                    quotesEnabled: quotesEnabled,
                                   ),
                                 ),
-                                const SizedBox(width: OrvaSpace.lg),
-                                Expanded(
-                                  flex: 5,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: _secondaryColumn(overview),
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                ..._primaryColumn(
-                                  overview,
-                                  quotesEnabled: quotesEnabled,
-                                ),
-                                const SizedBox(height: OrvaSpace.lg),
-                                ..._secondaryColumn(overview),
-                              ],
-                            ),
-                        ],
-                      ),
+                              ),
+                            ],
+                          )
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ..._primaryColumn(overview),
+                              const SizedBox(height: OrvaSpace.lg),
+                              ..._secondaryColumn(
+                                overview,
+                                quotesEnabled: quotesEnabled,
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       );
     }
 
@@ -513,10 +502,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  List<Widget> _primaryColumn(
-    HomeOverview overview, {
-    required bool quotesEnabled,
-  }) {
+  List<Widget> _primaryColumn(HomeOverview overview) {
     return [
       HomeHero(
         overview: overview,
@@ -543,28 +529,13 @@ class _HomePageState extends ConsumerState<HomePage> {
           onPlan: _planDay,
         ),
       ],
-      if (!overview.hasEntries && _checklist.total > 0) ...[
-        const SizedBox(height: OrvaSpace.lg),
-        PrioritiesCard(
-          items: _items,
-          obligations: overview.pendingObligations,
-          onToggleItem: _toggleChecklistItem,
-          onOpenChecklists: () => widget.onNavigate(1),
-          onOpenObligations: () =>
-              _openPage(ObligationsPage(initialDate: _now)),
-        ),
-      ],
-      if (quotesEnabled) ...[
-        const SizedBox(height: OrvaSpace.lg),
-        HomeReflectionCard(
-          quote: quoteOfTheDay(_now).text,
-          author: quoteOfTheDay(_now).author,
-        ),
-      ],
     ];
   }
 
-  List<Widget> _secondaryColumn(HomeOverview overview) {
+  List<Widget> _secondaryColumn(
+    HomeOverview overview, {
+    required bool quotesEnabled,
+  }) {
     final sections = <Widget>[];
 
     final hasPriorities =
@@ -583,8 +554,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     if (!_habits.isEmpty) {
-      if (sections.isNotEmpty)
+      if (sections.isNotEmpty) {
         sections.add(const SizedBox(height: OrvaSpace.lg));
+      }
       sections.add(
         HabitConsistencyCard(
           report: _habits,
@@ -594,8 +566,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     if (_goals.isNotEmpty) {
-      if (sections.isNotEmpty)
+      if (sections.isNotEmpty) {
         sections.add(const SizedBox(height: OrvaSpace.lg));
+      }
       sections.add(
         GoalsCard(
           goals: _goals,
@@ -609,12 +582,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     if (_study.hasEvidence) {
-      if (sections.isNotEmpty)
+      if (sections.isNotEmpty) {
         sections.add(const SizedBox(height: OrvaSpace.lg));
+      }
       sections.add(
         StudyEvidenceCard(
           study: _study,
-          onOpen: () => _openPage(const ExecutionsPage()),
+          onOpen: () => _openPage(const StudyPage()),
         ),
       );
     }
@@ -624,6 +598,18 @@ class _HomePageState extends ConsumerState<HomePage> {
         const HomeQuietState(
           icon: Icons.insights_outlined,
           message: 'Consistência, metas e estudo aparecem aqui assim que você registrar os primeiros dados.',
+        ),
+      );
+    }
+
+    if (quotesEnabled) {
+      if (sections.isNotEmpty) {
+        sections.add(const SizedBox(height: OrvaSpace.lg));
+      }
+      sections.add(
+        HomeReflectionCard(
+          quote: quoteOfTheDay(_now).text,
+          author: quoteOfTheDay(_now).author,
         ),
       );
     }
@@ -680,4 +666,50 @@ class _HomeScaffold extends StatelessWidget {
 String _formatQuantity(double value) {
   if (value == value.roundToDouble()) return value.round().toString();
   return value.toStringAsFixed(1);
+}
+
+class _HabitQuantityDialog extends StatefulWidget {
+  const _HabitQuantityDialog({
+    required this.habitName,
+    required this.unit,
+    required this.initialValue,
+  });
+
+  final String habitName;
+  final String unit;
+  final String initialValue;
+
+  @override
+  State<_HabitQuantityDialog> createState() => _HabitQuantityDialogState();
+}
+
+class _HabitQuantityDialogState extends State<_HabitQuantityDialog> {
+  late final _controller = TextEditingController(text: widget.initialValue);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text('Registrar ${widget.habitName}'),
+    content: TextField(
+      controller: _controller,
+      autofocus: true,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(labelText: widget.unit),
+      onSubmitted: (_) => _submit(),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Salvar')),
+    ],
+  );
+
+  void _submit() => Navigator.pop(context, _controller.text);
 }

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/orva_widget_background"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <include layout="@layout/widget_locked" />
+
+    <LinearLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:letterSpacing="0.08"
+            android:text="PROGRESSO · HOJE"
+            android:textColor="@color/orva_widget_secondary"
+            android:textSize="9sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_progress_coverage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="13%"
+                android:textColor="@color/orva_widget_primary"
+                android:textSize="30sp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="3dp"
+                android:layout_weight="1"
+                android:text="do planejado executado"
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/widget_progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="5dp"
+            android:layout_marginTop="2dp"
+            android:max="100"
+            android:progress="0"
+            android:progressBackgroundTint="@color/orva_widget_primary_soft"
+            android:progressTint="@color/orva_widget_primary" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="9dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Planejado "
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/widget_progress_planned"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="4h"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Executado "
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/widget_progress_executed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="30min"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Checklist "
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/widget_progress_checklist"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="25%"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Livre "
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/widget_progress_free"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="20h"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_progress_conflicts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:text="1 conflito"
+            android:textColor="@color/orva_widget_accent"
+            android:textSize="10sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <include layout="@layout/widget_footer" />
+</LinearLayout>

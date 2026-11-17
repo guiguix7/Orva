@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/orva_widget_background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <include layout="@layout/widget_locked" />
+
+    <LinearLayout
+        android:id="@+id/widget_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:letterSpacing="0.08"
+                android:text="HÁBITOS · 7 DIAS"
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/widget_habits_percent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:text="71%"
+                android:textColor="@color/orva_widget_primary"
+                android:textSize="20sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_habits_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="5 de 7 oportunidades"
+            android:textColor="@color/orva_widget_secondary"
+            android:textSize="9sp" />
+
+        <LinearLayout
+            android:id="@+id/widget_habit_row_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_habit_name_1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Leitura diária"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/widget_habit_today_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Feito hoje"
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/widget_habit_pct_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="86%"
+                android:textColor="@color/orva_widget_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_habit_row_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_habit_name_2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Meditação"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/widget_habit_today_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Pendente hoje"
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/widget_habit_pct_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="57%"
+                android:textColor="@color/orva_widget_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_habit_row_3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_habit_name_3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Alongamento"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/widget_habit_today_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Hoje não"
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/widget_habit_pct_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="—"
+                android:textColor="@color/orva_widget_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_habit_row_4"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_habit_name_4"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Escrita"
+                android:textColor="@color/orva_widget_text"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/widget_habit_today_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="Pendente hoje"
+                android:textColor="@color/orva_widget_secondary"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/widget_habit_pct_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="43%"
+                android:textColor="@color/orva_widget_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <include layout="@layout/widget_footer" />
+</LinearLayout>
