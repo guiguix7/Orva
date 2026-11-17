@@ -22,7 +22,7 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 
 | Area | Evidence | Interpretation |
 |---|---|---|
-| Home | lib/features/home/home_page.dart, home_widgets.dart, lib/core/domain/home_overview.dart | Command center: planned vs executed time with a 24h ribbon, live/next activity, compact timeline with now marker, checklist and obligation priorities, rolling 7-day habit consistency, goals, study evidence and five quick actions wired to existing editors. Pure domain has unit tests; widget tests cover 390/430/768/1440, dark and empty states; browser QA evidence in screenshots/home-qa/. |
+| Home | lib/features/home/home_page.dart, home_widgets.dart, lib/core/domain/home_overview.dart | Command center: planned vs executed time with a 24h ribbon, day-allocation donut chart, live/next activity, compact timeline with now marker, checklist and obligation priorities, weekly hobbies, rolling 7-day habit consistency, goals, study evidence and five quick actions wired to existing editors. Pure domain has unit tests; widget tests cover 390/430/768/1440, dark and empty states; browser QA evidence in screenshots/home-qa/. |
 | Checklists | lib/features/checklists/ and repository | Existing checklist/occurrence system; investigate reuse before creating missions. |
 | Goals | lib/features/goals/goals_page.dart | CRUD/status/history; inspected editor uses manual progress. |
 | Calendar | lib/features/calendar/, calendar_repository.dart, lib/core/domain/calendar_layout.dart | Day timeline, week and month views over routine blocks, obligations, meal plans and executions. Block editor and weekly templates live in lib/features/routine/routine_editor.dart. |

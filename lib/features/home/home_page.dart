@@ -21,6 +21,7 @@ import '../checklists/checklists_page.dart';
 import '../executions/executions_page.dart';
 import '../goals/goals_page.dart';
 import '../habits/habits_page.dart';
+import '../hobbies/hobbies_page.dart';
 import '../obligations/obligations_page.dart';
 import '../quotes/quotes_data.dart';
 import '../routine/routine_editor.dart';
@@ -56,6 +57,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   ChecklistDigest _checklist = ChecklistDigest.empty;
   List<Map<String, Object?>> _items = const [];
   List<Map<String, Object?>> _goals = const [];
+  List<Map<String, Object?>> _hobbies = const [];
   List<CalendarEntry> _entries = const [];
   List<HabitRecord> _habitRecords = const [];
   HabitReport _habits = HabitReport.empty;
@@ -154,6 +156,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         repo.getTodayOccurrenceItems(day),
         repo.getGoals(status: 'active'),
         repo.getStudySummary(from: weekStart, to: day),
+        repo.getWeeklyHobbyMinutes(date: day),
       ]);
       final entries = (values[1] as List<CalendarEntry>).toList();
       final items = values[2] as List<Map<String, Object?>>;
@@ -176,6 +179,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _checklist = ChecklistDigest(completed: completed, total: items.length);
         _items = items;
         _goals = (values[3] as List<Map<String, Object?>>).take(3).toList();
+        _hobbies = (values[5] as List<Map<String, Object?>>).take(3).toList();
         _habitRecords = habitRecords;
         _habits = report;
         _study = StudyDigest(
@@ -513,6 +517,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       const SizedBox(height: 12),
       HomeQuickActionBar(onAction: _handleQuickAction),
+      const SizedBox(height: OrvaSpace.lg),
+      DayAllocationCard(
+        categories: _plannedCategories(overview),
+        plannedMinutes: overview.plannedMinutes,
+        onOpen: _openCalendar,
+      ),
       if (overview.hasEntries) ...[
         const SizedBox(height: OrvaSpace.lg),
         NextActivityCard(
@@ -593,14 +603,15 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
     }
 
-    if (sections.isEmpty && !overview.hasEntries) {
-      sections.add(
-        const HomeQuietState(
-          icon: Icons.insights_outlined,
-          message: 'Consistência, metas e estudo aparecem aqui assim que você registrar os primeiros dados.',
-        ),
-      );
+    if (sections.isNotEmpty) {
+      sections.add(const SizedBox(height: OrvaSpace.lg));
     }
+    sections.add(
+      HobbiesCard(
+        hobbies: _hobbies,
+        onOpen: () => _openPage(const HobbiesPage()),
+      ),
+    );
 
     if (quotesEnabled) {
       if (sections.isNotEmpty) {
@@ -615,6 +626,21 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     return sections;
+  }
+
+  Map<String, int> _plannedCategories(HomeOverview overview) {
+    final intervals = overview.items.where((item) => item.isPlanned).map((
+      item,
+    ) {
+      final category = item.entry.category.trim();
+      return PlannedInterval(
+        item.entry.startMinute,
+        item.entry.endMinute,
+        category.isEmpty ? 'Sem categoria' : category,
+        item.entry.title,
+      );
+    });
+    return categoryMinutes(intervals);
   }
 
   HomeAgendaItem? _highlightedItem(HomeOverview overview) {

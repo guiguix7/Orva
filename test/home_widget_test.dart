@@ -78,6 +78,13 @@ void main() {
       category: 'Estudo',
       progress: 62,
     );
+    await repository.saveHobby(name: 'Violão', weeklyTargetMinutes: 120);
+    final hobbies = await repository.getWeeklyHobbyMinutes(date: now);
+    await repository.addHobbySession(
+      hobbyId: hobbies.first['id'] as String,
+      sessionDate: key,
+      durationMinutes: 45,
+    );
   }
 
   Future<void> pumpHome(
@@ -113,6 +120,9 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.text('SEU DIA'), findsOneWidget);
         expect(find.text('Foco profundo'), findsWidgets);
+        expect(find.text('OCUPAÇÃO DO DIA'), findsOneWidget);
+        expect(find.text('HOBBIES'), findsOneWidget);
+        expect(find.text('Violão'), findsOneWidget);
         expect(find.byType(HomePage), findsOneWidget);
         // Dispose the page timer before the next test.
         await tester.pumpWidget(const SizedBox.shrink());

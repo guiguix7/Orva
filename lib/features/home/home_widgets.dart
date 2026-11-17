@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -1527,6 +1528,337 @@ class _ObligationRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Day allocation chart
+// ---------------------------------------------------------------------------
+
+class DayAllocationCard extends StatelessWidget {
+  const DayAllocationCard({
+    super.key,
+    required this.categories,
+    required this.plannedMinutes,
+    required this.onOpen,
+  });
+
+  final Map<String, int> categories;
+  final int plannedMinutes;
+  final VoidCallback onOpen;
+
+  static const _colors = [
+    OrvaColors.primary,
+    OrvaColors.information,
+    OrvaColors.terracotta,
+    OrvaColors.mustard,
+    OrvaColors.success,
+    Color(0xFF8B6B9E),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = categories.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final occupied = plannedMinutes.clamp(0, 1440);
+    final free = 1440 - occupied;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(
+          title: 'Ocupação do dia',
+          actionLabel: 'Rotina',
+          onAction: onOpen,
+        ),
+        const SizedBox(height: 10),
+        OrvaSurface(
+          child: entries.isEmpty
+              ? Row(
+                  children: [
+                    const _SoftIcon(icon: Icons.donut_large_outlined),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Text(
+                        'Nenhum bloco planejado para hoje. Adicione horários para ver a ocupação do dia.',
+                        style: TextStyle(fontSize: 13, height: 1.4),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: onOpen,
+                      child: const Text('Planejar'),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    SizedBox(
+                      width: 118,
+                      height: 118,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox.expand(
+                            child: CustomPaint(
+                              painter: _DailyRingPainter(
+                                minutes: entries
+                                    .map((entry) => entry.value)
+                                    .toList(),
+                                colors: _colors,
+                                freeMinutes: free,
+                                emptyColor: _hairline(context),
+                              ),
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${(occupied / 1440 * 100).round()}%',
+                                style: orvaMonoStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: OrvaColors.primary,
+                                ),
+                              ),
+                              Text(
+                                'planejado',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(fontSize: 10.5),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < entries.length;
+                            index++
+                          ) ...[
+                            if (index < 4)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: _colors[index % _colors.length],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        entries[index].key,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(fontSize: 12),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      formatMinutes(entries[index].value),
+                                      style: orvaMonoStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                          if (entries.length > 4)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  '+${entries.length - 4} categorias',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(fontSize: 11),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DailyRingPainter extends CustomPainter {
+  const _DailyRingPainter({
+    required this.minutes,
+    required this.colors,
+    required this.freeMinutes,
+    required this.emptyColor,
+  });
+
+  final List<int> minutes;
+  final List<Color> colors;
+  final int freeMinutes;
+  final Color emptyColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 8;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14
+      ..strokeCap = StrokeCap.butt;
+    var angle = -math.pi / 2;
+    for (var index = 0; index < minutes.length; index++) {
+      final sweep = minutes[index] / 1440 * 2 * math.pi;
+      paint.color = colors[index % colors.length];
+      canvas.drawArc(rect, angle, sweep, false, paint);
+      angle += sweep;
+    }
+    paint.color = emptyColor;
+    final remaining = math.max(0, freeMinutes) / 1440 * 2 * math.pi;
+    canvas.drawArc(rect, angle, remaining, false, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DailyRingPainter oldDelegate) =>
+      oldDelegate.freeMinutes != freeMinutes ||
+      oldDelegate.emptyColor != emptyColor ||
+      !listEquals(oldDelegate.minutes, minutes);
+}
+
+// ---------------------------------------------------------------------------
+// Hobbies
+// ---------------------------------------------------------------------------
+
+class HobbiesCard extends StatelessWidget {
+  const HobbiesCard({super.key, required this.hobbies, required this.onOpen});
+
+  final List<Map<String, Object?>> hobbies;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(
+          title: 'Hobbies',
+          actionLabel: 'Ver hobbies',
+          onAction: onOpen,
+        ),
+        const SizedBox(height: 10),
+        OrvaSurface(
+          child: hobbies.isEmpty
+              ? Row(
+                  children: [
+                    const _SoftIcon(icon: Icons.sports_esports_outlined),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Text(
+                        'Registre hobbies para acompanhar o tempo que realmente dedica a eles.',
+                        style: TextStyle(fontSize: 13, height: 1.4),
+                      ),
+                    ),
+                    TextButton(onPressed: onOpen, child: const Text('Abrir')),
+                  ],
+                )
+              : Column(
+                  children: [
+                    for (var index = 0; index < hobbies.length; index++) ...[
+                      _HobbyRow(hobby: hobbies[index]),
+                      if (index < hobbies.length - 1)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Divider(height: 1, color: _hairline(context)),
+                        ),
+                    ],
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HobbyRow extends StatelessWidget {
+  const _HobbyRow({required this.hobby});
+
+  final Map<String, Object?> hobby;
+
+  @override
+  Widget build(BuildContext context) {
+    final actual = intValue(hobby['actual_minutes']);
+    final target = (hobby['weekly_target_minutes'] as num?)?.toInt();
+    final progress = target == null || target <= 0
+        ? null
+        : (actual / target).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${hobby['name'] ?? 'Hobby'}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyLarge
+                    ?.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              formatMinutes(actual),
+              style: orvaMonoStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: OrvaColors.terracotta,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        if (progress != null && target != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              color: OrvaColors.terracotta,
+              backgroundColor: OrvaColors.terracottaLight,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Meta semanal: ${formatMinutes(target)}',
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(fontSize: 11),
+          ),
+        ] else
+          Text(
+            'Tempo registrado nesta semana',
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(fontSize: 11),
+          ),
+      ],
     );
   }
 }
