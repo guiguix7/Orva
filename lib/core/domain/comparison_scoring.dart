@@ -276,6 +276,29 @@ final class ComparisonSummary {
   double get coverage => activeTraits == 0 ? 0 : assessedTraits / activeTraits;
 }
 
+/// Read-model used by the Home summary. It keeps the selected period, the
+/// representative window and the weighted result together so the card can show
+/// coverage without recalculating rules.
+final class ComparisonDigest {
+  const ComparisonDigest({
+    required this.period,
+    required this.window,
+    required this.summary,
+    required this.alfredoName,
+    required this.betoName,
+  });
+
+  final ComparisonPeriod period;
+  final DateRange window;
+  final ComparisonSummary summary;
+  final String alfredoName;
+  final String betoName;
+
+  bool get hasTraits => summary.activeTraits > 0;
+
+  int get traitsWithEvidence => summary.activeTraits - summary.unknownTraits;
+}
+
 ComparisonSummary summarizeComparison(Iterable<TraitEvaluation> evaluations) {
   var alfredo = 0.0;
   var beto = 0.0;

@@ -1,6 +1,6 @@
 # Feature Specification — Consistency and Progress Analytics
 
-Status: PARTIALLY IMPLEMENTED foundations; a complete analytics experience was not established in the audited tree.
+Status: PARTIALLY IMPLEMENTED. The Home has a tested rolling seven-day activity chart and life-area summaries; a complete historical analytics experience was not established.
 
 Priority: P1 — Very urgent.
 
@@ -106,3 +106,28 @@ Every chart names metric and time range, provides units/readable axes, handles e
 6. Period boundaries are tested.
 7. Source correction updates projections predictably.
 8. Charts work on small screens and with assistive technology.
+
+## 9. Implemented Home metrics
+
+### Rolling seven-day activity
+
+- Window: seven local calendar days including today (`today - 6` through `today`), not a Monday-first calendar week.
+- Numerator: per day, `execution_minutes` from `executions.reference_date` excluding executions whose `reference_type` is `study` or `hobby`, plus `study_sessions.duration_minutes` by `session_date`, plus `hobby_sessions.duration_minutes` by `session_date`.
+- Exclusions: planned routine blocks, obligations and meal plans are not executed activity. A study or hobby session represented by a linked execution is counted once through the domain-session source.
+- Unit: minutes. Days with no record render as empty, not as a fabricated zero-value bar or failure.
+- Total: sum across the seven days. Active days: days with total minutes greater than zero. Average: total divided by active days, not by seven.
+- Interpretation text and the source definition are shown with the chart. The current day is labelled `hoje`; the partial current day is disclosed (`Hoje ainda está em andamento`); the range is labelled `ÚLTIMOS 7 DIAS`.
+- Implementation: `lib/core/domain/home_dashboard.dart` (`buildWeeklyActivity`), `WeeklyActivityCard`, with source queries `executionMinutesByDay`, `studyMinutesByDay` and `hobbyMinutesByDay`.
+
+### Weekly hobby summary
+
+- Window: current local Monday through Sunday, matching the Hobbies module; the current week is labelled as in progress.
+- Per hobby: session minutes and session count inside the window, optional weekly target, progress only when recorded minutes are greater than zero and a target exists.
+- Empty state: a configured hobby with no session this week is shown neutrally as no recorded session; the card does not invent progress.
+- Implementation: `getWeeklyHobbyMinutes` and `HobbiesCard`.
+
+### Beto vs Alfredo summary
+
+- Uses the selected comparison period and the same trait rules, per-trait windows, measurement sources and `summarizeComparison` projection as the Comparison page.
+- Shows assessed/unknown coverage and the period, including `até hoje` or `em andamento` when the window has not closed. It shows a result only when assessed evidence exists; missing records remain unknown.
+- Implementation: `getComparisonDigest` and `ComparisonSummaryCard`.

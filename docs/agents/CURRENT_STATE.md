@@ -1,6 +1,6 @@
 # Orva — Verified Repository Snapshot
 
-Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2026-10-30. This is a snapshot, not a guarantee that main has not changed. Re-check HEAD before implementation.
+Audit baseline: main at commit 3b131ac, dated 2026-11-17, plus the uncommitted Home Dashboard V2 work described below. This is a snapshot, not a guarantee that main has not changed. Re-check HEAD before implementation.
 
 ## 1. Confirmed repository facts
 
@@ -14,7 +14,7 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 - Feature UI: lib/features/.
 - CI: .github/workflows/flutter-validation.yml.
 - CI executes dependency resolution, formatting, static analysis, Flutter tests, and Android debug APK build.
-- Most recent Actions run observed for the audited HEAD: success, run 45, 2026-10-30. This is not physical-device evidence.
+- Actions workflow pins Flutter 3.50.0 and the Android project uses AGP 9.1.1. The last observed CI run for the pre-fix HEAD failed the Android debug APK step; after the AGP/workflow fixes, local `flutter build apk --debug` succeeded on 2026-11-17. A new CI run has not been observed, so CI is not yet proven green. This is not physical-device evidence.
 - README describes local-first/offline behavior, local SQLite, explicit JSON backup export/import, no required account, and no telemetry in the audited configuration.
 - Privacy documentation says SQLite is not encrypted at rest. Do not claim otherwise.
 
@@ -22,7 +22,7 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 
 | Area | Evidence | Interpretation |
 |---|---|---|
-| Home | lib/features/home/home_page.dart, home_widgets.dart, lib/core/domain/home_overview.dart | Command center: planned vs executed time with a 24h ribbon, day-allocation donut chart, live/next activity, compact timeline with now marker, checklist and obligation priorities, weekly hobbies, rolling 7-day habit consistency, goals, study evidence and five quick actions wired to existing editors. Pure domain has unit tests; widget tests cover 390/430/768/1440, dark and empty states; browser QA evidence in screenshots/home-qa/. |
+| Home | lib/features/home/home_page.dart, home_widgets.dart, lib/core/domain/home_overview.dart, lib/core/domain/home_dashboard.dart | Command center: planned vs executed time with a 24h ribbon, day-allocation donut chart, live/next activity, compact timeline with now marker, checklist and obligation priorities, weekly hobbies with session counts and targets, rolling 7-day habit consistency, goals, study evidence, Beto-vs-Alfredo coverage and a rolling seven-day activity chart. Executions, study sessions and hobby sessions are separate sources; executions linked to study/hobby reference types are excluded from the chart total. Summary sections can be hidden through the local `home_hidden_sections` setting. Pure dashboard and overview calculations have unit tests; widget tests cover 390/430/768/1440, dark, empty, large-text and preference states; browser QA evidence in screenshots/home-qa/. |
 | Checklists | lib/features/checklists/ and repository | Existing checklist/occurrence system; investigate reuse before creating missions. |
 | Goals | lib/features/goals/goals_page.dart | CRUD/status/history; inspected editor uses manual progress. |
 | Calendar | lib/features/calendar/, calendar_repository.dart, lib/core/domain/calendar_layout.dart | Day timeline, week and month views over routine blocks, obligations, meal plans and executions. Block editor and weekly templates live in lib/features/routine/routine_editor.dart. |
@@ -48,7 +48,8 @@ Audit baseline: main at commit a93c629fc481734db580f3d9e0fbe575779051e5, dated 2
 - Beto/Alfredo comparison exists as a v1 MVP (queries + UI + tests). Missing: immutable closed-period history, per-trait evidence history view, and any XP/analytics coupling.
 - A complete manual + record-derived recurring mission domain was not established. Existing checklists may be reusable but semantics must be reviewed.
 - No complete XP/level/achievement/prestige system was found.
-- Historical analytics beyond existing summaries/charts are incomplete and need metric definitions.
+- The Home now has a tested rolling seven-day activity chart and life-area summaries. Historical analytics beyond that, category-distribution charts and period comparison remain incomplete and need metric definitions.
+- Home dashboard section visibility is persisted locally; ordering is fixed and there is no generic dashboard builder.
 - Ollama, vice tracking, workout tracking, and finance tracking were not found implemented.
 - No physical Android-device test evidence was established by this audit.
 

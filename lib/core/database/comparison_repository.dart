@@ -378,6 +378,59 @@ extension ComparisonRepository on OrvaRepository {
     };
   }
 
+  /// Read-only projection for the Home. It evaluates active traits over the
+  /// same windows used by the comparison screen and never seeds or mutates data.
+  Future<ComparisonDigest> getComparisonDigest({DateTime? today}) async {
+    final day = today ?? DateTime.now();
+    final period = await getComparisonPeriod();
+    final window = resolveComparisonWindow(
+      traitWindowDays: 0,
+      selected: period,
+      today: day,
+    );
+    final traits = await getComparisonTraits();
+    final evaluations = <TraitEvaluation>[];
+    for (final trait in traits) {
+      if ((trait['is_active'] as num?)?.toInt() != 1) continue;
+      final rule = TraitRule(
+        side: comparisonSideFromStorage(trait['target_character'] as String),
+        measurement: traitMeasurementFromStorage(
+          trait['measurement_type'] as String,
+        ),
+        threshold: (trait['threshold'] as num).toDouble(),
+        weight: (trait['weight'] as num?)?.toDouble() ?? 1,
+        windowDays: (trait['window_days'] as num?)?.toInt() ?? 0,
+      );
+      final traitWindow = resolveComparisonWindow(
+        traitWindowDays: rule.windowDays,
+        selected: period,
+        today: day,
+      );
+      final measured = await measureComparisonTrait(trait, traitWindow);
+      evaluations.add(
+        evaluateTrait(
+          traitId: trait['id'] as String,
+          rule: rule,
+          measuredValue: measured,
+          window: traitWindow,
+        ),
+      );
+    }
+    final profiles = await getComparisonProfiles();
+    String name(String role, String fallback) {
+      final value = (profiles[role]?['display_name'] as String?)?.trim();
+      return value == null || value.isEmpty ? fallback : value;
+    }
+
+    return ComparisonDigest(
+      period: period,
+      window: window,
+      summary: summarizeComparison(evaluations),
+      alfredoName: name('alfredo', 'Alfredo'),
+      betoName: name('beto', 'Beto'),
+    );
+  }
+
   Future<ComparisonPeriod> getComparisonPeriod() async =>
       comparisonPeriodFromStorage(await getSetting(comparisonPeriodSettingKey));
 

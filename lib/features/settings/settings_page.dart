@@ -160,7 +160,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 18),
         const OrvaSurface(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.privacy_tip_outlined, color: OrvaColors.information), SizedBox(width: 10), Expanded(child: Text('Os dados do Orva ficam no armazenamento local do aplicativo. Isso não equivale a criptografia de ponta a ponta nem a um cofre criptografado. Guarde seus backups com cuidado.'))])),
         const SizedBox(height: 26),
-        Text('Orva · versão 1.0.0', style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
+        Text('Orva · versão 2.1.0+3', style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
       ]),
     );
   }

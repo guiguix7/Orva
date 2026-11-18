@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/domain/calendar_layout.dart';
+import '../../core/domain/comparison_scoring.dart';
+import '../../core/domain/home_dashboard.dart';
 import '../../core/domain/home_overview.dart';
 import '../../core/theme/orva_theme.dart';
 import '../../core/theme/orva_tokens.dart';
@@ -48,10 +50,12 @@ class HomeTopBar extends StatelessWidget {
     super.key,
     required this.onOpenCalendar,
     required this.onOpenSettings,
+    required this.onCustomize,
   });
 
   final VoidCallback onOpenCalendar;
   final VoidCallback onOpenSettings;
+  final VoidCallback onCustomize;
 
   @override
   Widget build(BuildContext context) {
@@ -83,10 +87,16 @@ class HomeTopBar extends StatelessWidget {
           icon: const Icon(Icons.calendar_month_outlined, size: 21),
         ),
         IconButton(
+          tooltip: 'Personalizar início',
+          onPressed: onCustomize,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.dashboard_customize_outlined, size: 21),
+        ),
+        IconButton(
           tooltip: 'Ajustes',
           onPressed: onOpenSettings,
           visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.tune_rounded, size: 21),
+          icon: const Icon(Icons.settings_outlined, size: 21),
         ),
       ],
     );
@@ -203,8 +213,14 @@ class HomeHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('SEU DIA', style: _micro(context, color: muted)),
-              const Spacer(),
+              Expanded(
+                child: Text(
+                  'SEU DIA',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _micro(context, color: muted),
+                ),
+              ),
               TextButton.icon(
                 onPressed: onOpenCalendar,
                 style: TextButton.styleFrom(
@@ -1745,6 +1761,183 @@ class _DailyRingPainter extends CustomPainter {
 }
 
 // ---------------------------------------------------------------------------
+// Weekly overview
+// ---------------------------------------------------------------------------
+
+class WeeklyActivityCard extends StatelessWidget {
+  const WeeklyActivityCard({
+    super.key,
+    required this.activity,
+    required this.onOpenCalendar,
+  });
+
+  final WeeklyActivity activity;
+  final VoidCallback onOpenCalendar;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!activity.hasEvidence) return const SizedBox.shrink();
+    final range =
+        '${DateFormat('d MMM', 'pt_BR').format(activity.start)} – '
+        '${DateFormat('d MMM', 'pt_BR').format(activity.end)}';
+    final average = activity.averageActiveMinutes.round();
+    final interpretation = switch (activity.activeDays) {
+      1 => 'Atividade em 1 dos últimos 7 dias.',
+      7 => 'Atividade registrada em todos os últimos 7 dias.',
+      _ => 'Atividade em ${activity.activeDays} dos últimos 7 dias.',
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(
+          title: 'Esta semana',
+          actionLabel: 'Calendário',
+          onAction: onOpenCalendar,
+        ),
+        const SizedBox(height: 10),
+        OrvaSurface(
+          onTap: onOpenCalendar,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('ÚLTIMOS 7 DIAS', style: _micro(context)),
+                        const SizedBox(height: 4),
+                        Text(
+                          range,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(fontSize: 11.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    formatMinutes(activity.totalMinutes),
+                    style: orvaMonoStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: OrvaColors.primary,
+                      letterSpacing: -0.7,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 100,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (final day in activity.days)
+                      Expanded(
+                        child: _WeeklyBar(
+                          day: day,
+                          maxMinutes: activity.maxDayMinutes,
+                          isToday: isSameLocalDay(day.day, activity.end),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '$interpretation Hoje ainda está em andamento. '
+                'Média de ${formatMinutes(average)} nos dias com registro.',
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Execuções, sessões de estudo e sessões de hobby. Blocos planejados não entram; dias sem registro ficam vazios.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 10.5,
+                  height: 1.35,
+                  color: OrvaColors.tertiaryText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WeeklyBar extends StatelessWidget {
+  const _WeeklyBar({
+    required this.day,
+    required this.maxMinutes,
+    required this.isToday,
+  });
+
+  final DailyActivity day;
+  final int maxMinutes;
+  final bool isToday;
+
+  static const _weekdays = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+
+  @override
+  Widget build(BuildContext context) {
+    final active = day.hasActivity;
+    final barHeight = active
+        ? math.max(6.0, 60 * day.totalMinutes / math.max(maxMinutes, 1))
+        : 2.0;
+    final label = isToday ? 'hoje' : _weekdays[day.day.weekday - 1];
+    final fullDay = DateFormat('EEEE', 'pt_BR').format(day.day);
+    return Semantics(
+      label:
+          '$fullDay, ${active ? '${day.totalMinutes} minutos de atividade' : 'sem registro'}',
+      child: ExcludeSemantics(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (active)
+              Text(
+                '${day.totalMinutes}',
+                maxLines: 1,
+                style: orvaMonoStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: OrvaColors.tertiaryText,
+                ),
+              ),
+            const SizedBox(height: 3),
+            Container(
+              width: 16,
+              height: barHeight,
+              decoration: BoxDecoration(
+                color: active
+                    ? (isToday ? OrvaColors.terracotta : OrvaColors.primary)
+                    : _hairline(context),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              style: _micro(
+                context,
+                size: 9,
+                color: isToday ? OrvaColors.terracotta : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Hobbies
 // ---------------------------------------------------------------------------
 
@@ -1756,6 +1949,16 @@ class HobbiesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final totalMinutes = hobbies.fold<int>(
+      0,
+      (total, hobby) => total + intValue(hobby['actual_minutes']),
+    );
+    final totalSessions = hobbies.fold<int>(
+      0,
+      (total, hobby) => total + intValue(hobby['session_count']),
+    );
+    final preview = hobbies.take(3).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1781,14 +1984,47 @@ class HobbiesCard extends StatelessWidget {
                   ],
                 )
               : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (var index = 0; index < hobbies.length; index++) ...[
-                      _HobbyRow(hobby: hobbies[index]),
-                      if (index < hobbies.length - 1)
+                    Text(
+                      totalSessions == 0
+                          ? 'Nenhuma sessão registrada nesta semana.'
+                          : '${formatMinutes(totalMinutes)} em '
+                                '$totalSessions '
+                                '${totalSessions == 1 ? 'sessão' : 'sessões'} '
+                                'nesta semana.',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Semana atual em andamento, de segunda a domingo.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: OrvaColors.tertiaryText,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    for (var index = 0; index < preview.length; index++) ...[
+                      _HobbyRow(hobby: preview[index]),
+                      if (index < preview.length - 1)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Divider(height: 1, color: _hairline(context)),
                         ),
+                    ],
+                    if (hobbies.length > preview.length) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        'mais ${hobbies.length - preview.length} '
+                        '${hobbies.length - preview.length == 1 ? 'hobby' : 'hobbies'}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                          color: OrvaColors.tertiaryText,
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -1806,10 +2042,13 @@ class _HobbyRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actual = intValue(hobby['actual_minutes']);
+    final sessions = intValue(hobby['session_count']);
     final target = (hobby['weekly_target_minutes'] as num?)?.toInt();
-    final progress = target == null || target <= 0
-        ? null
-        : (actual / target).clamp(0.0, 1.0);
+    final hasTarget = target != null && target > 0;
+    final progress = hasTarget ? (actual / target).clamp(0.0, 1.0) : null;
+    final sessionLabel = sessions == 0
+        ? 'Nenhuma sessão registrada nesta semana'
+        : '$sessions ${sessions == 1 ? 'sessão' : 'sessões'} nesta semana';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1830,13 +2069,24 @@ class _HobbyRow extends StatelessWidget {
               style: orvaMonoStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: OrvaColors.terracotta,
+                color: actual > 0
+                    ? OrvaColors.terracotta
+                    : OrvaColors.tertiaryText,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 7),
-        if (progress != null && target != null) ...[
+        const SizedBox(height: 5),
+        Text(
+          [
+            sessionLabel,
+            if (hasTarget) 'meta semanal: ${formatMinutes(target)}',
+          ].join(' · '),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(fontSize: 11, height: 1.35),
+        ),
+        if (progress != null && actual > 0) ...[
+          const SizedBox(height: 7),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
@@ -1848,16 +2098,13 @@ class _HobbyRow extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Meta semanal: ${formatMinutes(target)}',
+            progress >= 1
+                ? 'Meta semanal atingida'
+                : '${(progress * 100).round()}% da meta semanal',
             style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(fontSize: 11),
+                ?.copyWith(fontSize: 10.5),
           ),
-        ] else
-          Text(
-            'Tempo registrado nesta semana',
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(fontSize: 11),
-          ),
+        ],
       ],
     );
   }
@@ -2229,6 +2476,103 @@ class StudyEvidenceCard extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Comparison
+// ---------------------------------------------------------------------------
+
+class ComparisonSummaryCard extends StatelessWidget {
+  const ComparisonSummaryCard({
+    super.key,
+    required this.digest,
+    required this.onOpen,
+  });
+
+  final ComparisonDigest digest;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!digest.hasTraits) return const SizedBox.shrink();
+    final summary = digest.summary;
+    final withEvidence = digest.traitsWithEvidence;
+    final result = summary.hasEvidence
+        ? '${digest.alfredoName} ${_percent(summary.alfredoShare)} · '
+              '${digest.betoName} ${_percent(summary.betoShare)}'
+        : withEvidence == 0
+        ? 'Sem dados registrados no período.'
+        : 'Nenhum critério atingiu a meta neste período.';
+    final range =
+        '${DateFormat('d MMM', 'pt_BR').format(digest.window.start)} – '
+        '${DateFormat('d MMM', 'pt_BR').format(digest.window.end)}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(
+          title: 'Comparação',
+          actionLabel: 'Beto × Alfredo',
+          onAction: onOpen,
+        ),
+        const SizedBox(height: 10),
+        OrvaSurface(
+          onTap: onOpen,
+          child: Row(
+            children: [
+              const _SoftIcon(icon: Icons.balance_outlined),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      result,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600, height: 1.3),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$withEvidence de ${summary.activeTraits} critérios com dados · '
+                      '${summary.unknownTraits} sem dados',
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(fontSize: 11.5),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_comparisonPeriodLabel(digest.period)} · $range',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 10.5,
+                        color: OrvaColors.tertiaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: OrvaColors.tertiaryText,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _percent(double? share) =>
+    share == null ? '—' : '${(share * 100).round()}%';
+
+String _comparisonPeriodLabel(ComparisonPeriod period) => switch (period) {
+  ComparisonPeriod.last7Days => 'Últimos 7 dias, até hoje',
+  ComparisonPeriod.last30Days => 'Últimos 30 dias, até hoje',
+  ComparisonPeriod.currentWeek => 'Semana atual em andamento',
+  ComparisonPeriod.currentMonth => 'Mês atual em andamento',
+};
 
 // ---------------------------------------------------------------------------
 // Reflection and states

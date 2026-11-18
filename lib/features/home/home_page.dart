@@ -6,10 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/database/calendar_repository.dart';
+import '../../core/database/comparison_repository.dart';
+import '../../core/database/executions_repository.dart';
 import '../../core/database/habits_repository.dart';
 import '../../core/database/orva_repository.dart';
 import '../../core/database/study_repository.dart';
 import '../../core/domain/calendar_layout.dart';
+import '../../core/domain/comparison_scoring.dart';
+import '../../core/domain/home_dashboard.dart';
 import '../../core/domain/home_overview.dart';
 import '../../core/domain/orva_calculations.dart';
 import '../../core/logging/orva_diagnostics.dart';
@@ -18,6 +22,7 @@ import '../../core/theme/orva_tokens.dart';
 import '../../core/widgets/orva_widgets.dart';
 import '../calendar/calendar_page.dart';
 import '../checklists/checklists_page.dart';
+import '../comparison/comparison_page.dart';
 import '../executions/executions_page.dart';
 import '../goals/goals_page.dart';
 import '../habits/habits_page.dart';
@@ -67,7 +72,20 @@ class _HomePageState extends ConsumerState<HomePage> {
     reviews: 0,
     studyDays: 0,
   );
+  WeeklyActivity? _weekly;
+  ComparisonDigest? _comparison;
+  Set<String> _hiddenSections = const {};
   String? _error;
+
+  static const _sectionLabels = <String, String>{
+    'week': 'Resumo da semana',
+    'habits': 'Hábitos',
+    'goals': 'Metas',
+    'study': 'Estudos',
+    'hobbies': 'Hobbies',
+    'comparison': 'Comparação',
+    'reflection': 'Reflexão do dia',
+  };
 
   @override
   void initState() {
@@ -157,6 +175,15 @@ class _HomePageState extends ConsumerState<HomePage> {
         repo.getGoals(status: 'active'),
         repo.getStudySummary(from: weekStart, to: day),
         repo.getWeeklyHobbyMinutes(date: day),
+        repo.getSetting('home_hidden_sections'),
+        repo.executionMinutesByDay(
+          from: habitWindowStart,
+          to: day,
+          excludeReferenceTypes: const {'study', 'hobby'},
+        ),
+        repo.studyMinutesByDay(from: habitWindowStart, to: day),
+        repo.hobbyMinutesByDay(from: habitWindowStart, to: day),
+        repo.getComparisonDigest(today: day),
       ]);
       final entries = (values[1] as List<CalendarEntry>).toList();
       final items = values[2] as List<Map<String, Object?>>;
@@ -170,6 +197,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         windowStart: habitWindowStart,
         today: day,
       );
+      final weekly = buildWeeklyActivity(
+        today: day,
+        executionMinutesByDay: values[7] as Map<String, int>,
+        studyMinutesByDay: values[8] as Map<String, int>,
+        hobbyMinutesByDay: values[9] as Map<String, int>,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -179,7 +212,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _checklist = ChecklistDigest(completed: completed, total: items.length);
         _items = items;
         _goals = (values[3] as List<Map<String, Object?>>).take(3).toList();
-        _hobbies = (values[5] as List<Map<String, Object?>>).take(3).toList();
+        _hobbies = values[5] as List<Map<String, Object?>>;
         _habitRecords = habitRecords;
         _habits = report;
         _study = StudyDigest(
@@ -188,6 +221,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           reviews: intValue(studyRow['reviews']),
           studyDays: intValue(studyRow['studyDays']),
         );
+        _hiddenSections = _parseHiddenSections(values[6]);
+        _weekly = weekly;
+        _comparison = values[10] as ComparisonDigest;
         _loading = false;
         _error = null;
       });
@@ -223,12 +259,85 @@ class _HomePageState extends ConsumerState<HomePage> {
     return const <int>{};
   }
 
+  Set<String> _parseHiddenSections(Object? raw) {
+    if (raw is! String || raw.trim().isEmpty) return const <String>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .whereType<String>()
+            .where(_sectionLabels.containsKey)
+            .toSet();
+      }
+    } on FormatException {
+      // A malformed preference must not break the Home.
+    }
+    return const <String>{};
+  }
+
+  bool _sectionVisible(String id) => !_hiddenSections.contains(id);
+
   // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
 
   Future<void> _openCalendar({String? entryId}) =>
       _openPage(CalendarPage(initialDate: _now, initialEntryId: entryId));
+
+  Future<void> _openCustomization() async {
+    final repo = ref.read(repositoryProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(
+              OrvaSpace.lg,
+              0,
+              OrvaSpace.lg,
+              OrvaSpace.lg,
+            ),
+            children: [
+              Text(
+                'Personalizar início',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Escolha quais resumos aparecem. O seu dia continua sempre visível.',
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: OrvaColors.tertiaryText),
+              ),
+              const SizedBox(height: OrvaSpace.sm),
+              for (final entry in _sectionLabels.entries)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(entry.value),
+                  value: _sectionVisible(entry.key),
+                  onChanged: (visible) async {
+                    final next = {..._hiddenSections};
+                    if (visible) {
+                      next.remove(entry.key);
+                    } else {
+                      next.add(entry.key);
+                    }
+                    setState(() => _hiddenSections = next);
+                    setSheetState(() {});
+                    await repo.setSetting(
+                      'home_hidden_sections',
+                      jsonEncode(next.toList()..sort()),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _openEntry(HomeAgendaItem item) =>
       _openCalendar(entryId: item.entry.id);
@@ -410,12 +519,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     } else {
       body = LayoutBuilder(
         builder: (context, constraints) {
-          final hasSecondary =
-              _items.isNotEmpty ||
-              overview.pendingObligations.isNotEmpty ||
-              !_habits.isEmpty ||
-              _goals.isNotEmpty ||
-              _study.hasEvidence;
+          final secondary = _secondaryColumn(
+            overview,
+            quotesEnabled: quotesEnabled,
+          );
+          final hasSecondary = secondary.isNotEmpty;
           final wide = constraints.maxWidth >= 980 && hasSecondary;
           final horizontal = constraints.maxWidth < 420 ? 18.0 : 24.0;
           return ListView(
@@ -437,6 +545,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       children: [
                         HomeTopBar(
                           onOpenCalendar: _openCalendar,
+                          onCustomize: _openCustomization,
                           onOpenSettings: () => widget.onNavigate(3),
                         ),
                         const SizedBox(height: OrvaSpace.lg),
@@ -468,10 +577,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 child: Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
-                                  children: _secondaryColumn(
-                                    overview,
-                                    quotesEnabled: quotesEnabled,
-                                  ),
+                                  children: secondary,
                                 ),
                               ),
                             ],
@@ -481,11 +587,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               ..._primaryColumn(overview),
-                              const SizedBox(height: OrvaSpace.lg),
-                              ..._secondaryColumn(
-                                overview,
-                                quotesEnabled: quotesEnabled,
-                              ),
+                              if (secondary.isNotEmpty) ...[
+                                const SizedBox(height: OrvaSpace.lg),
+                                ...secondary,
+                              ],
                             ],
                           ),
                       ],
@@ -547,11 +652,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     required bool quotesEnabled,
   }) {
     final sections = <Widget>[];
+    void addSection(Widget section) {
+      if (sections.isNotEmpty) {
+        sections.add(const SizedBox(height: OrvaSpace.lg));
+      }
+      sections.add(section);
+    }
 
     final hasPriorities =
         _items.isNotEmpty || overview.pendingObligations.isNotEmpty;
     if (hasPriorities) {
-      sections.add(
+      addSection(
         PrioritiesCard(
           items: _items,
           obligations: overview.pendingObligations,
@@ -563,11 +674,27 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
     }
 
-    if (!_habits.isEmpty) {
-      if (sections.isNotEmpty) {
-        sections.add(const SizedBox(height: OrvaSpace.lg));
-      }
-      sections.add(
+    final weekly = _weekly;
+    if (_sectionVisible('week') && weekly != null && weekly.hasEvidence) {
+      addSection(
+        WeeklyActivityCard(activity: weekly, onOpenCalendar: _openCalendar),
+      );
+    }
+
+    final comparison = _comparison;
+    if (_sectionVisible('comparison') &&
+        comparison != null &&
+        comparison.hasTraits) {
+      addSection(
+        ComparisonSummaryCard(
+          digest: comparison,
+          onOpen: () => _openPage(const ComparisonPage()),
+        ),
+      );
+    }
+
+    if (_sectionVisible('habits') && !_habits.isEmpty) {
+      addSection(
         HabitConsistencyCard(
           report: _habits,
           onOpen: () => _openPage(const HabitsPage()),
@@ -575,11 +702,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
     }
 
-    if (_goals.isNotEmpty) {
-      if (sections.isNotEmpty) {
-        sections.add(const SizedBox(height: OrvaSpace.lg));
-      }
-      sections.add(
+    if (_sectionVisible('goals') && _goals.isNotEmpty) {
+      addSection(
         GoalsCard(
           goals: _goals,
           onOpen: () => widget.onNavigate(2),
@@ -591,11 +715,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
     }
 
-    if (_study.hasEvidence) {
-      if (sections.isNotEmpty) {
-        sections.add(const SizedBox(height: OrvaSpace.lg));
-      }
-      sections.add(
+    if (_sectionVisible('study') && _study.hasEvidence) {
+      addSection(
         StudyEvidenceCard(
           study: _study,
           onOpen: () => _openPage(const StudyPage()),
@@ -603,21 +724,17 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
     }
 
-    if (sections.isNotEmpty) {
-      sections.add(const SizedBox(height: OrvaSpace.lg));
+    if (_sectionVisible('hobbies')) {
+      addSection(
+        HobbiesCard(
+          hobbies: _hobbies,
+          onOpen: () => _openPage(const HobbiesPage()),
+        ),
+      );
     }
-    sections.add(
-      HobbiesCard(
-        hobbies: _hobbies,
-        onOpen: () => _openPage(const HobbiesPage()),
-      ),
-    );
 
-    if (quotesEnabled) {
-      if (sections.isNotEmpty) {
-        sections.add(const SizedBox(height: OrvaSpace.lg));
-      }
-      sections.add(
+    if (_sectionVisible('reflection') && quotesEnabled) {
+      addSection(
         HomeReflectionCard(
           quote: quoteOfTheDay(_now).text,
           author: quoteOfTheDay(_now).author,

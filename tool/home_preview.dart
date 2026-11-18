@@ -12,6 +12,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 
 import 'package:orva/core/database/app_database.dart';
+import 'package:orva/core/database/comparison_repository.dart';
 import 'package:orva/core/database/executions_repository.dart';
 import 'package:orva/core/database/habits_repository.dart';
 import 'package:orva/core/database/orva_repository.dart';
@@ -157,10 +158,59 @@ Future<void> _seed(OrvaRepository repository, DateTime now) async {
 
   await repository.saveStudySubject(name: 'Cálculo II');
   final subjects = await repository.getStudySubjects();
-  await repository.saveStudySession(
-    subjectId: subjects.first['id'] as String,
-    sessionDate: day,
-    startMinute: 14 * 60,
-    durationMinutes: 60,
+  for (var back = 0; back < 5; back++) {
+    await repository.saveStudySession(
+      subjectId: subjects.first['id'] as String,
+      sessionDate: day.subtract(Duration(days: back)),
+      startMinute: 14 * 60,
+      durationMinutes: back.isEven ? 60 : 40,
+    );
+  }
+
+  for (var back = 1; back < 6; back++) {
+    await repository.saveExecution(
+      title: back.isEven ? 'Caminhada' : 'Leitura',
+      category: back.isEven ? 'Exercício' : 'Estudo',
+      startedAt: DateTime(day.year, day.month, day.day, 7, 30),
+      durationMinutes: back.isEven ? 30 : 45,
+      referenceDate: day.subtract(Duration(days: back)),
+    );
+  }
+
+  await repository.saveHobby(
+    name: 'Violão',
+    category: 'Música',
+    weeklyTargetMinutes: 180,
   );
+  await repository.saveHobby(
+    name: 'Xadrez',
+    category: 'Estratégia',
+    weeklyTargetMinutes: 120,
+  );
+  final hobbies = await repository.getHobbies();
+  final guitar = hobbies.firstWhere((item) => item['name'] == 'Violão');
+  final chess = hobbies.firstWhere((item) => item['name'] == 'Xadrez');
+  for (final (back, minutes) in [(0, 45), (2, 60), (4, 30)]) {
+    await repository.addHobbySession(
+      hobbyId: guitar['id'] as String,
+      sessionDate: repository.dateKey(day.subtract(Duration(days: back))),
+      durationMinutes: minutes,
+    );
+  }
+  await repository.addHobbySession(
+    hobbyId: chess['id'] as String,
+    sessionDate: repository.dateKey(day.subtract(const Duration(days: 1))),
+    durationMinutes: 75,
+  );
+
+  await repository.ensureComparisonSeeded();
+  for (final id in ['tpl_leitura', 'tpl_treino']) {
+    for (var back = 0; back < (id == 'tpl_leitura' ? 5 : 3); back++) {
+      await repository.setComparisonCheckin(
+        traitId: id,
+        date: day.subtract(Duration(days: back)),
+        recorded: true,
+      );
+    }
+  }
 }

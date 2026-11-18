@@ -542,10 +542,39 @@ final class OrvaRepository {
     final target = date ?? DateTime.now();
     final monday = DateTime(target.year, target.month, target.day).subtract(Duration(days: target.weekday - 1));
     final sunday = monday.add(const Duration(days: 6));
+    final start = Variable.withString(dateKey(monday));
+    final end = Variable.withString(dateKey(sunday));
     return rows('''SELECT h.id, h.name, h.is_active, h.weekly_target_minutes,
-      COALESCE(SUM(CASE WHEN hs.session_date BETWEEN ? AND ? THEN hs.duration_minutes ELSE 0 END),0) AS actual_minutes
+      COALESCE(SUM(CASE WHEN hs.session_date BETWEEN ? AND ? THEN hs.duration_minutes ELSE 0 END),0) AS actual_minutes,
+      COALESCE(SUM(CASE WHEN hs.session_date BETWEEN ? AND ? THEN 1 ELSE 0 END),0) AS session_count,
+      MAX(CASE WHEN hs.session_date BETWEEN ? AND ? THEN hs.session_date END) AS last_session_date
       FROM hobbies h LEFT JOIN hobby_sessions hs ON hs.hobby_id=h.id
-      WHERE ${includeArchived ? '1=1' : 'h.is_active=1'} GROUP BY h.id ORDER BY h.name COLLATE NOCASE''', [Variable.withString(dateKey(monday)), Variable.withString(dateKey(sunday))]);
+      WHERE ${includeArchived ? '1=1' : 'h.is_active=1'} GROUP BY h.id ORDER BY h.name COLLATE NOCASE''', [start, end, start, end, start, end]);
+  }
+
+  /// Real hobby minutes grouped by local session date.
+  Future<Map<String, int>> hobbyMinutesByDay({DateTime? from, DateTime? to}) async {
+    final conditions = <String>[];
+    final variables = <Variable<Object>>[];
+    if (from != null) {
+      conditions.add('session_date >= ?');
+      variables.add(Variable.withString(dateKey(from)));
+    }
+    if (to != null) {
+      conditions.add('session_date <= ?');
+      variables.add(Variable.withString(dateKey(to)));
+    }
+    final where = conditions.isEmpty ? '' : 'WHERE ${conditions.join(' AND ')}';
+    final result = await rows(
+      '''SELECT session_date, COALESCE(SUM(duration_minutes),0) AS minutes
+      FROM hobby_sessions $where GROUP BY session_date''',
+      variables,
+    );
+    return {
+      for (final row in result)
+        if (row['session_date'] is String)
+          row['session_date'] as String: (row['minutes'] as num?)?.toInt() ?? 0,
+    };
   }
 
   Future<void> deleteHobbySession(String id) => execute('DELETE FROM hobby_sessions WHERE id=?', [id]);

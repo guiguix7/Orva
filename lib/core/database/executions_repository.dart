@@ -82,6 +82,41 @@ extension ExecutionsRepository on OrvaRepository {
     return rows.fold<int>(0, (sum, row) => sum + (row['duration_minutes'] as int? ?? 0));
   }
 
+  /// Real minutes grouped by local reference date. Pass [excludeReferenceTypes]
+  /// when another module's records already account for the same activity.
+  Future<Map<String, int>> executionMinutesByDay({
+    DateTime? from,
+    DateTime? to,
+    Set<String> excludeReferenceTypes = const {},
+  }) async {
+    final conditions = <String>[];
+    final variables = <Variable<Object>>[];
+    if (from != null) {
+      conditions.add('reference_date >= ?');
+      variables.add(Variable.withString(dateKey(from)));
+    }
+    if (to != null) {
+      conditions.add('reference_date <= ?');
+      variables.add(Variable.withString(dateKey(to)));
+    }
+    const knownTypes = {'routine_block', 'obligation', 'hobby', 'study', 'habit', 'custom'};
+    final excluded = excludeReferenceTypes.where(knownTypes.contains).toList();
+    if (excluded.isNotEmpty) {
+      conditions.add('reference_type NOT IN (${List.filled(excluded.length, '?').join(',')})');
+      variables.addAll(excluded.map(Variable.withString));
+    }
+    final where = conditions.isEmpty ? '' : 'WHERE ${conditions.join(' AND ')}';
+    final result = await rows('''
+      SELECT reference_date, COALESCE(SUM(duration_minutes),0) AS minutes
+      FROM executions $where GROUP BY reference_date
+    ''', variables);
+    return {
+      for (final row in result)
+        if (row['reference_date'] is String)
+          row['reference_date'] as String: (row['minutes'] as num?)?.toInt() ?? 0,
+    };
+  }
+
   Future<Map<String, int>> executionMinutesByCategory({
     DateTime? from,
     DateTime? to,

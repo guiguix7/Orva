@@ -245,6 +245,30 @@ extension StudyRepository on OrvaRepository {
     ''',[id??newId(),subjectId,topicId,dateKey(reviewedAt),reviewKind,confidence,note.trim(),now]);
   }
 
+  /// Study minutes grouped by local session date for the Home weekly chart.
+  Future<Map<String, int>> studyMinutesByDay({DateTime? from, DateTime? to}) async {
+    final clauses = <String>[];
+    final vars = <Variable<Object>>[];
+    if (from != null) {
+      clauses.add('session_date>=?');
+      vars.add(Variable.withString(dateKey(from)));
+    }
+    if (to != null) {
+      clauses.add('session_date<=?');
+      vars.add(Variable.withString(dateKey(to)));
+    }
+    final where = clauses.isEmpty ? '' : 'WHERE ${clauses.join(' AND ')}';
+    final result = await rows('''
+      SELECT session_date, COALESCE(SUM(duration_minutes),0) AS minutes
+      FROM study_sessions $where GROUP BY session_date
+    ''', vars);
+    return {
+      for (final row in result)
+        if (row['session_date'] is String)
+          row['session_date'] as String: (row['minutes'] as num?)?.toInt() ?? 0,
+    };
+  }
+
   Future<Map<String,Object?>> getStudySummary({DateTime? from,DateTime? to}) async {
     final clauses=<String>[];
     final vars=<Variable<Object>>[];

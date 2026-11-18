@@ -62,7 +62,7 @@ class MorePage extends StatelessWidget {
     const SizedBox(height: 20),
     const OrvaSurface(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.lock_outline_rounded, color: OrvaColors.primary), SizedBox(width: 10), Expanded(child: Text('Privado por padrão. As funções essenciais não dependem de uma conta nem de conexão com a internet.'))])),
     const SizedBox(height: 18),
-    Text('A grade completa de calendário dia/semana/mês e os gráficos históricos avançados continuam em desenvolvimento.', style: Theme.of(context).textTheme.bodySmall),
+    Text('O calendário dia/semana/mês já está disponível. Gráficos históricos avançados e missões recorrentes continuam em desenvolvimento.', style: Theme.of(context).textTheme.bodySmall),
   ]));
 
   void _open(BuildContext context, Widget page) {
