@@ -1,7 +1,7 @@
 name: orva
 description: Aplicativo pessoal de organização, rotina e evolução.
 publish_to: 'none'
-version: 2.1.0+3
+version: 2.2.0+4
 
 environment:
   sdk: ^3.13.5

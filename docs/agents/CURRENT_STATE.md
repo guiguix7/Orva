@@ -1,6 +1,6 @@
 # Orva — Verified Repository Snapshot
 
-Audit baseline: main at commit 3b131ac, dated 2026-11-17, plus the uncommitted Home Dashboard V2 work described below. This is a snapshot, not a guarantee that main has not changed. Re-check HEAD before implementation.
+Audit baseline: main at commit 60ff93a, dated 2026-11-17, plus the v2.2.0 release packaging described below. This is a snapshot, not a guarantee that main has not changed. Re-check HEAD before implementation.
 
 ## 1. Confirmed repository facts
 
